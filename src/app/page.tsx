@@ -55,12 +55,28 @@ export default function Home() {
     }
   };
 
+  const getSeverityColor = (severity) => {
+    switch (severity.toLowerCase()) {
+      case 'severe': return 'bg-red-100 text-red-800 border-red-300';
+      case 'moderate': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'mild': return 'bg-blue-100 text-blue-800 border-blue-300';
+      default: return 'bg-green-100 text-green-800 border-green-300';
+    }
+  };
+
+  const renderAssessmentSection = (title, content, borderColor = 'border-gray-300') => (
+    <div className={`p-6 bg-white rounded-lg shadow-lg border-2 ${borderColor}`}>
+      <h3 className="text-xl font-semibold text-gray-900 mb-3">{title}</h3>
+      {content}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-3xl mx-auto p-8">
+      <div className="max-w-4xl mx-auto p-8">
         <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-xl shadow-xl p-8 mb-8">
           <h1 className="text-4xl font-bold text-center mb-2">Mental Health Assessment</h1>
-          <p className="text-center text-white text-lg">Track and understand your mental well-being</p>
+          <p className="text-center text-white text-lg">Clinical Assessment and Recommendations</p>
         </div>
 
         <div className="flex gap-2 mb-2">
@@ -79,200 +95,398 @@ export default function Home() {
         </div>
 
         <div className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-8">
-          {activeTab === 'emotional' && (
-            <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Emotional Assessment</h2>
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">How are you feeling today?</label>
-                <textarea
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 min-h-[100px] text-gray-900 text-lg bg-white shadow-inner"
-                  placeholder="Describe your current emotional state..."
-                  value={data.emotional.mood}
-                  onChange={(e) => setData({...data, emotional: { ...data.emotional, mood: e.target.value }})}
-                />
-              </div>
+  {/* Emotional Assessment Section */}
+  {activeTab === 'emotional' && (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Emotional Assessment</h2>
+      
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          How are you feeling today?
+        </label>
+        <textarea
+          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 min-h-[100px] text-gray-900 text-lg bg-white shadow-inner"
+          placeholder="Describe your current emotional state..."
+          value={data.emotional.mood}
+          onChange={(e) => setData({
+            ...data,
+            emotional: { ...data.emotional, mood: e.target.value }
+          })}
+        />
+      </div>
 
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Emotional Intensity (1-10)</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={data.emotional.intensity}
-                    onChange={(e) => setData({...data, emotional: { ...data.emotional, intensity: parseInt(e.target.value) }})}
-                    className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <span className="text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-blue-200">
-                    {data.emotional.intensity}
-                  </span>
-                </div>
-              </div>
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Emotional Intensity (1-10)
+        </label>
+        <div className="flex items-center gap-4">
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={data.emotional.intensity}
+            onChange={(e) => setData({
+              ...data,
+              emotional: { ...data.emotional, intensity: parseInt(e.target.value) }
+            })}
+            className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          />
+          <span className="text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-blue-200">
+            {data.emotional.intensity}
+          </span>
+        </div>
+      </div>
 
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Are you feeling anxious?</label>
-                <div className="flex gap-4">
-                  {['Yes', 'No'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => setData({...data, emotional: { ...data.emotional, anxiety: option === 'Yes' }})}
-                      className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors
-                        ${data.emotional.anxiety === (option === 'Yes')
-                          ? 'bg-blue-700 text-white shadow-md'
-                          : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'}`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Are you experiencing mood swings?
+        </label>
+        <div className="flex gap-4">
+          {['Yes', 'No'].map((option) => (
+            <button
+              key={option}
+              onClick={() => setData({
+                ...data,
+                emotional: { ...data.emotional, moodSwings: option === 'Yes' }
+              })}
+              className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors
+                ${data.emotional.moodSwings === (option === 'Yes')
+                  ? 'bg-blue-700 text-white shadow-md'
+                  : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'}`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          {activeTab === 'cognitive' && (
-            <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Cognitive Assessment</h2>
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Concentration Level (1-10)</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={data.cognitive.concentration}
-                    onChange={(e) => setData({...data, cognitive: { ...data.cognitive, concentration: parseInt(e.target.value) }})}
-                    className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <span className="text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-blue-200">
-                    {data.cognitive.concentration}
-                  </span>
-                </div>
-              </div>
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Are you feeling anxious?
+        </label>
+        <div className="flex gap-4">
+          {['Yes', 'No'].map((option) => (
+            <button
+              key={option}
+              onClick={() => setData({
+                ...data,
+                emotional: { ...data.emotional, anxiety: option === 'Yes' }
+              })}
+              className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors
+                ${data.emotional.anxiety === (option === 'Yes')
+                  ? 'bg-blue-700 text-white shadow-md'
+                  : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'}`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
 
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Memory Issues</label>
-                <div className="flex gap-4">
-                  {['Yes', 'No'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => setData({...data, cognitive: { ...data.cognitive, memoryIssues: option === 'Yes' }})}
-                      className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors
-                        ${data.cognitive.memoryIssues === (option === 'Yes')
-                          ? 'bg-blue-700 text-white shadow-md'
-                          : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'}`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
+  {/* Cognitive Assessment Section */}
+  {activeTab === 'cognitive' && (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Cognitive Assessment</h2>
+      
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Concentration Level (1-10)
+        </label>
+        <div className="flex items-center gap-4">
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={data.cognitive.concentration}
+            onChange={(e) => setData({
+              ...data,
+              cognitive: { ...data.cognitive, concentration: parseInt(e.target.value) }
+            })}
+            className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          />
+          <span className="text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-blue-200">
+            {data.cognitive.concentration}
+          </span>
+        </div>
+      </div>
 
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Describe any recurring thoughts</label>
-                <textarea
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 min-h-[100px] text-gray-900 text-lg bg-white shadow-inner"
-                  placeholder="Describe any thoughts that keep coming back..."
-                  value={data.cognitive.thoughtPatterns}
-                  onChange={(e) => setData({...data, cognitive: { ...data.cognitive, thoughtPatterns: e.target.value }})}
-                />
-              </div>
-            </div>
-          )}
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Are you experiencing memory issues?
+        </label>
+        <div className="flex gap-4">
+          {['Yes', 'No'].map((option) => (
+            <button
+              key={option}
+              onClick={() => setData({
+                ...data,
+                cognitive: { ...data.cognitive, memoryIssues: option === 'Yes' }
+              })}
+              className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors
+                ${data.cognitive.memoryIssues === (option === 'Yes')
+                  ? 'bg-blue-700 text-white shadow-md'
+                  : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'}`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          {activeTab === 'behavioral' && (
-            <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Behavioral Assessment</h2>
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Sleep Quality</label>
-                <select
-                  value={data.behavioral.sleep}
-                  onChange={(e) => setData({...data, behavioral: { ...data.behavioral, sleep: e.target.value }})}
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900 text-lg bg-white shadow-inner"
-                >
-                  <option value="good">Good</option>
-                  <option value="fair">Fair</option>
-                  <option value="poor">Poor</option>
-                </select>
-              </div>
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Describe any recurring thoughts
+        </label>
+        <textarea
+          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 min-h-[100px] text-gray-900 text-lg bg-white shadow-inner"
+          placeholder="Describe any thoughts that keep coming back..."
+          value={data.cognitive.thoughtPatterns}
+          onChange={(e) => setData({
+            ...data,
+            cognitive: { ...data.cognitive, thoughtPatterns: e.target.value }
+          })}
+        />
+      </div>
+    </div>
+  )}
 
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Social Activity Level</label>
-                <select
-                  value={data.behavioral.socialActivity}
-                  onChange={(e) => setData({...data, behavioral: { ...data.behavioral, socialActivity: e.target.value }})}
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900 text-lg bg-white shadow-inner"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="reduced">Reduced</option>
-                  <option value="withdrawn">Withdrawn</option>
-                  <option value="increased">Increased</option>
-                </select>
-              </div>
+  {/* Behavioral Assessment Section */}
+  {activeTab === 'behavioral' && (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Behavioral Assessment</h2>
+      
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Sleep Quality
+        </label>
+        <select
+          value={data.behavioral.sleep}
+          onChange={(e) => setData({
+            ...data,
+            behavioral: { ...data.behavioral, sleep: e.target.value }
+          })}
+          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900 text-lg bg-white shadow-inner"
+        >
+          <option value="good">Good</option>
+          <option value="fair">Fair</option>
+          <option value="poor">Poor</option>
+        </select>
+      </div>
 
-              <div>
-                <label className="block text-lg font-semibold text-gray-900 mb-2">Daily Activities</label>
-                <div className="space-y-3">
-                  {['Exercise', 'Work/Study', 'Hobbies', 'Social Interaction', 'Self-Care'].map(activity => (
-                    <label key={activity} className="flex items-center gap-3 p-4 border-2 border-gray-300 rounded-lg hover:bg-blue-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={data.behavioral.activities.includes(activity)}
-                        onChange={(e) => {
-                          const newActivities = e.target.checked
-                            ? [...data.behavioral.activities, activity]
-                            : data.behavioral.activities.filter(a => a !== activity);
-                          setData({...data, behavioral: { ...data.behavioral, activities: newActivities }});
-                        }}
-                        className="w-5 h-5 rounded border-gray-400 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-gray-900 text-lg">{activity}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Social Activity Level
+        </label>
+        <select
+          value={data.behavioral.socialActivity}
+          onChange={(e) => setData({
+            ...data,
+            behavioral: { ...data.behavioral, socialActivity: e.target.value }
+          })}
+          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900 text-lg bg-white shadow-inner"
+        >
+          <option value="normal">Normal</option>
+          <option value="reduced">Reduced</option>
+          <option value="withdrawn">Withdrawn</option>
+          <option value="increased">Increased</option>
+        </select>
+      </div>
 
+      <div>
+        <label className="block text-lg font-semibold text-gray-900 mb-2">
+          Daily Activities
+        </label>
+        <div className="space-y-3">
+          {['Exercise', 'Work/Study', 'Hobbies', 'Social Interaction', 'Self-Care'].map(activity => (
+            <label key={activity} className="flex items-center gap-3 p-4 border-2 border-gray-300 rounded-lg hover:bg-blue-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={data.behavioral.activities.includes(activity)}
+                onChange={(e) => {
+                  const newActivities = e.target.checked
+                    ? [...data.behavioral.activities, activity]
+                    : data.behavioral.activities.filter(a => a !== activity);
+                  setData({
+                    ...data,
+                    behavioral: { ...data.behavioral, activities: newActivities }
+                  });
+                }}
+                className="w-5 h-5 rounded border-gray-400 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-gray-900 text-lg">{activity}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+
+ 
+
+          
+          {/* Updated Results Section */}
           {activeTab === 'results' && assessment && (
             <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Assessment Results</h2>
-              <div className="space-y-6">
-                <div className="p-6 bg-white rounded-lg shadow-lg border-2 border-gray-300">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Initial Assessment</h3>
-                  <p className="text-gray-800">{assessment.assessment}</p>
-                </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Clinical Assessment Results</h2>
+              
+              {/* Clinical Assessment Overview */}
+              {renderAssessmentSection('Clinical Assessment',
+                <div className="space-y-4">
+                  <div className={`inline-block px-4 py-2 rounded-full font-medium ${getSeverityColor(assessment.clinicalAssessment?.severityLevel)}`}>
+                    Severity Level: {assessment.clinicalAssessment?.severityLevel}
+                  </div>
+                  
+                  <div className="mt-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Primary Symptoms:</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.clinicalAssessment?.primarySymptoms.map((symptom, index) => (
+                        <li key={index} className="text-gray-800">{symptom}</li>
+                      ))}
+                    </ul>
+                  </div>
 
-                <div className="p-6 bg-white rounded-lg shadow-lg border-2 border-gray-300">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Recommendations</h3>
-                  <ul className="list-disc pl-5 space-y-2">
-                    {assessment.recommendations?.map((rec, index) => (
-                      <li key={index} className="text-gray-800">{rec}</li>
-                    ))}
-                  </ul>
+                  <div className="mt-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Diagnostic Considerations:</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.clinicalAssessment?.diagnosticConsiderations.map((consideration, index) => (
+                        <li key={index} className="text-gray-800">{consideration}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
+              )}
 
-                {assessment.requiresProfessionalHelp && (
-                  <div className="p-6 bg-red-50 rounded-lg border-l-4 border-red-500">
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0">
-                        <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-red-800">Professional Help Recommended</h3>
-                        <p className="mt-2 text-sm text-red-700">
-                          Based on your responses, we recommend consulting with a mental health professional for a thorough evaluation.
-                        </p>
-                      </div>
+              {/* Diagnostic Indications */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Depression Assessment */}
+                {renderAssessmentSection('Depression Indicators',
+                  <div>
+                    <div className={`inline-block px-4 py-2 rounded-full font-medium mb-4 ${
+                      getSeverityColor(assessment.diagnosticIndications?.depression.severity)
+                    }`}>
+                      Score: {assessment.diagnosticIndications?.depression.score}/27
                     </div>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.diagnosticIndications?.depression.keySymptoms.map((symptom, index) => (
+                        <li key={index} className="text-gray-800">{symptom}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Anxiety Assessment */}
+                {renderAssessmentSection('Anxiety Indicators',
+                  <div>
+                    <div className={`inline-block px-4 py-2 rounded-full font-medium mb-4 ${
+                      getSeverityColor(assessment.diagnosticIndications?.anxiety.severity)
+                    }`}>
+                      Score: {assessment.diagnosticIndications?.anxiety.score}/21
+                    </div>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.diagnosticIndications?.anxiety.keySymptoms.map((symptom, index) => (
+                        <li key={index} className="text-gray-800">{symptom}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
+
+              {/* Treatment Recommendations */}
+              {renderAssessmentSection('Treatment Plan',
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Immediate Steps:</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.treatmentPlan?.immediate.map((step, index) => (
+                        <li key={index} className="text-gray-800">{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Recommended Therapy Approaches:</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.treatmentPlan?.therapyApproaches.map((approach, index) => (
+                        <li key={index} className="text-gray-800">{approach}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Professional Care Recommendations */}
+              {renderAssessmentSection('Professional Care Recommendations',
+                <div className="space-y-4">
+                  <div className={`inline-block px-4 py-2 rounded-full font-medium ${
+                    assessment.professionalCare?.urgencyLevel === 'Urgent' 
+                      ? 'bg-red-100 text-red-800' 
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    Urgency Level: {assessment.professionalCare?.urgencyLevel}
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Recommended Healthcare Providers:</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.professionalCare?.recommendedProviders.map((provider, index) => (
+                        <li key={index} className="text-gray-800">{provider}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {assessment.professionalCare?.sessionFrequency && (
+                    <div className="mt-2">
+                      <h4 className="font-medium text-gray-900 mb-2">Recommended Session Frequency:</h4>
+                      <p className="text-gray-800">{assessment.professionalCare.sessionFrequency}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Support Resources */}
+              {renderAssessmentSection('Support Resources',
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Clinical Resources:</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.supportResources?.clinical.map((resource, index) => (
+                        <li key={index} className="text-gray-800">{resource}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Support Groups:</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {assessment.supportResources?.support.map((group, index) => (
+                        <li key={index} className="text-gray-800">{group}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Crisis Resources */}
+              {assessment.supportResources?.crisis.length > 0 && (
+                <div className="p-6 bg-red-50 rounded-lg border-l-4 border-red-500">
+                  <div className="flex items-start">
+                    <div className="ml-3">
+                      <h3 className="text-lg font-medium text-red-800">Crisis Resources</h3>
+                      <ul className="mt-2 list-disc pl-5 space-y-1">
+                        {assessment.supportResources.crisis.map((resource, index) => (
+                          <li key={index} className="text-red-700">{resource}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
+        {/* Navigation Buttons */}
         <div className="flex justify-between mt-6">
           {activeTab !== 'emotional' && activeTab !== 'results' && (
             <button
@@ -297,7 +511,7 @@ export default function Home() {
                 hover:from-blue-800 hover:to-blue-950 transition-colors font-semibold text-lg ml-auto 
                 shadow-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {isSubmitting ? 'Processing...' : 'Submit Assessment'}
+              {isSubmitting ? 'Processing Assessment...' : 'Get Clinical Assessment'}
             </button>
           ) : null}
         </div>
@@ -306,7 +520,7 @@ export default function Home() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <div className="bg-white p-6 rounded-lg shadow-xl">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700 mx-auto"></div>
-              <p className="mt-4 text-gray-700">Analyzing your responses...</p>
+              <p className="mt-4 text-gray-700">Analyzing clinical data...</p>
             </div>
           </div>
         )}

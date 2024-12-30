@@ -10,58 +10,115 @@ export async function POST(request: Request) {
     const data = await request.json();
 
     const prompt = `
-    As a mental health professional, analyze the following assessment data and provide comprehensive insights:
-    
+    As a clinical psychologist, provide a comprehensive mental health assessment based on the following data, using DSM-5 criteria and evidence-based assessment tools:
+
+    Patient Data:
     Emotional State:
-    - Mood: ${data.emotional.mood}
+    - Mood Description: ${data.emotional.mood}
     - Emotional Intensity: ${data.emotional.intensity}/10
     - Anxiety Present: ${data.emotional.anxiety}
+    - Mood Swings: ${data.emotional.moodSwings}
     
     Cognitive State:
     - Concentration Level: ${data.cognitive.concentration}/10
     - Memory Issues: ${data.cognitive.memoryIssues}
     - Thought Patterns: ${data.cognitive.thoughtPatterns}
     
-    Behavioral State:
+    Behavioral Patterns:
     - Sleep Quality: ${data.behavioral.sleep}
     - Social Activity: ${data.behavioral.socialActivity}
     - Daily Activities: ${data.behavioral.activities.join(', ')}
 
-    Please provide a detailed response including:
-    1. Initial assessment summary
-    2. Severity level (mild/moderate/severe)
-    3. Detailed action plan with:
-       - Immediate steps to take
-       - Daily practices to implement
+    Please provide a detailed clinical assessment including:
+
+    1. Clinical Assessment:
+       - Primary symptoms analysis based on DSM-5 criteria
+       - Potential diagnostic considerations for depression, anxiety, and bipolar disorder
+       - Severity assessment using standardized metrics
+       - Risk assessment
+
+    2. Diagnostic Considerations:
+       - Depression indicators (PHQ-9 based)
+       - Anxiety assessment (GAD-7 based)
+       - Bipolar disorder screening (MDQ based)
+       - Other potential concerns
+
+    3. Treatment Recommendations:
+       - Evidence-based therapeutic approaches
+       - Psychotherapy recommendations
        - Lifestyle modifications
-       - Relaxation techniques
-       - Social support suggestions
-    4. Self-care recommendations:
-       - Mind-body practices
-       - Exercise suggestions
-       - Sleep hygiene tips
-       - Stress management techniques
-    5. Professional support recommendations if needed
-    6. Resources and support groups
-    
-    Format the response as JSON with these keys: 
+       - Support system engagement
+       - Crisis resources if needed
+
+    4. Clinical Action Plan:
+       - Immediate interventions needed
+       - Short-term treatment goals
+       - Long-term management strategies
+       - Monitoring recommendations
+
+    5. Professional Support Framework:
+       - Type of mental health professionals needed
+       - Frequency of recommended sessions
+       - Additional assessments needed
+       - Interdisciplinary care considerations
+
+    6. Support Resources:
+       - Clinical support services
+       - Crisis intervention resources
+       - Support groups
+       - Educational materials
+       - Family support recommendations
+
+    Format the response as JSON with these keys:
     {
-      assessment: string,
-      severity: string,
-      actionPlan: string[],
-      selfCareRecommendations: {
-        mindBody: string[],
-        exercise: string[],
-        sleep: string[],
-        stress: string[]
+      clinicalAssessment: {
+        primarySymptoms: string[],
+        diagnosticConsiderations: string[],
+        severityLevel: string,
+        riskLevel: string
       },
-      professionalHelp: {
-        recommended: boolean,
-        urgency: string,
-        type: string[]
+      diagnosticIndications: {
+        depression: {
+          score: number,
+          severity: string,
+          keySymptoms: string[]
+        },
+        anxiety: {
+          score: number,
+          severity: string,
+          keySymptoms: string[]
+        },
+        bipolar: {
+          indicated: boolean,
+          warningSigns: string[]
+        }
       },
-      resources: string[]
+      treatmentPlan: {
+        immediate: string[],
+        shortTerm: string[],
+        longTerm: string[],
+        therapyApproaches: string[]
+      },
+      professionalCare: {
+        recommendedProviders: string[],
+        sessionFrequency: string,
+        additionalAssessments: string[],
+        urgencyLevel: string
+      },
+      supportResources: {
+        clinical: string[],
+        crisis: string[],
+        support: string[],
+        educational: string[]
+      },
+      followUpCare: {
+        timeline: string,
+        monitoringPlan: string,
+        warningSignsToWatch: string[]
+      }
     }
+    
+    Base all assessments on DSM-5 criteria, clinical best practices, and evidence-based treatment guidelines.
     `;
 
     const completion = await openai.chat.completions.create({
@@ -69,7 +126,7 @@ export async function POST(request: Request) {
       messages: [
         { 
           role: "system", 
-          content: "You are a mental health assessment expert who provides detailed, actionable recommendations for mental well-being."
+          content: "You are a clinical psychologist with expertise in DSM-5 diagnostics and evidence-based mental health assessments. Provide comprehensive clinical evaluations and treatment recommendations based on established psychological assessment tools and clinical best practices."
         },
         { 
           role: "user", 
@@ -85,7 +142,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Assessment error:', error);
     return NextResponse.json(
-      { error: 'Failed to process assessment' },
+      { error: 'Failed to process clinical assessment' },
       { status: 500 }
     );
   }
