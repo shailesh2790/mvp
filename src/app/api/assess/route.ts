@@ -1,148 +1,222 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+interface AssessmentData {
+  emotional: {
+    mood: string;
+    intensity: number;
+    anxiety: boolean;
+    moodSwings: boolean;
+    voiceJournal?: string;
+  };
+  cognitive: {
+    concentration: number;
+    memoryIssues: boolean;
+    focusIssues: boolean;
+    thoughtPatterns: string;
+  };
+  behavioral: {
+    sleep: string;
+    sleepHours: number;
+    socialActivity: string;
+    activities: string[];
+  };
+  eqMetrics: {
+    selfAwareness: number;
+    empathy: number;
+    regulation: number;
+  };
+}
+
+async function queryMistral(prompt: string) {
+  try {
+    const response = await fetch('http://localhost:11435/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "mistral",
+        prompt: prompt,
+        stream: false,
+        format: "json"
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Mistral API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.response;
+  } catch (error) {
+    console.error('Mistral API error:', error);
+    throw error;
+  }
+}
+
+function validateAssessmentData(data: Partial<AssessmentData>): void {
+  if (!data) throw new Error('Assessment data is required');
+  
+  // Initialize missing sections with default values
+  data.emotional = data.emotional || {
+    mood: 'not specified',
+    intensity: 5,
+    anxiety: false,
+    moodSwings: false
+  };
+  
+  data.cognitive = data.cognitive || {
+    concentration: 5,
+    memoryIssues: false,
+    focusIssues: false,
+    thoughtPatterns: 'not specified'
+  };
+
+  data.behavioral = data.behavioral || {
+    sleep: 'not specified',
+    sleepHours: 8,
+    socialActivity: 'not specified',
+    activities: []
+  };
+
+  data.eqMetrics = data.eqMetrics || {
+    selfAwareness: 5,
+    empathy: 5,
+    regulation: 5
+  };
+
+  // Validate data ranges
+  if (data.emotional.intensity !== undefined && 
+      (typeof data.emotional.intensity !== 'number' || 
+       data.emotional.intensity < 0 || 
+       data.emotional.intensity > 10)) {
+    throw new Error('Emotional intensity must be between 0 and 10');
+  }
+
+  if (data.behavioral.sleepHours !== undefined && 
+      (typeof data.behavioral.sleepHours !== 'number' || 
+       data.behavioral.sleepHours < 0 || 
+       data.behavioral.sleepHours > 24)) {
+    throw new Error('Sleep hours must be between 0 and 24');
+  }
+
+  const eqMetrics = ['selfAwareness', 'empathy', 'regulation'] as const;
+  for (const metric of eqMetrics) {
+    const value = data.eqMetrics[metric];
+    if (value !== undefined && 
+        (typeof value !== 'number' || 
+         value < 0 || 
+         value > 10)) {
+      throw new Error(`${metric} must be between 0 and 10`);
+    }
+  }
+}
+
+function constructPrompt(data: AssessmentData): string {
+  return `As an expert clinical psychologist, analyze this mental health assessment data and provide a comprehensive evaluation. Format your response as a specific JSON object.
+
+Assessment Data:
+Emotional State:
+- Mood: ${data.emotional.mood}
+- Intensity: ${data.emotional.intensity}/10
+- Anxiety Present: ${data.emotional.anxiety}
+- Mood Swings: ${data.emotional.moodSwings}
+${data.emotional.voiceJournal ? `- Voice Journal: ${data.emotional.voiceJournal}` : ''}
+
+Cognitive State:
+- Concentration: ${data.cognitive.concentration}/10
+- Memory Issues: ${data.cognitive.memoryIssues}
+- Focus Issues: ${data.cognitive.focusIssues}
+- Thought Patterns: ${data.cognitive.thoughtPatterns}
+
+Behavioral Patterns:
+- Sleep Quality: ${data.behavioral.sleep}
+- Sleep Hours: ${data.behavioral.sleepHours}
+- Social Activity: ${data.behavioral.socialActivity}
+- Activities: ${data.behavioral.activities.join(', ')}
+
+EQ Metrics:
+- Self Awareness: ${data.eqMetrics.selfAwareness}/10
+- Empathy: ${data.eqMetrics.empathy}/10
+- Regulation: ${data.eqMetrics.regulation}/10
+
+Provide your evaluation in this exact JSON format:
+{
+  "clinicalAssessment": {
+    "severityLevel": "string (Low/Moderate/High)",
+    "primarySymptoms": ["string array of main symptoms"]
+  },
+  "diagnosticIndications": {
+    "anxiety": {
+      "severity": "string (Low/Moderate/High)",
+      "keySymptoms": ["string array of anxiety symptoms"]
+    },
+    "depression": {
+      "severity": "string (Low/Moderate/High)",
+      "keySymptoms": ["string array of depression symptoms"]
+    }
+  },
+  "eqDevelopment": {
+    "strengths": ["string array of emotional strengths"],
+    "areasForImprovement": ["string array of areas to work on"],
+    "exercises": ["string array of recommended exercises"]
+  },
+  "treatmentPlan": {
+    "immediate": ["string array of immediate actions"],
+    "longTerm": ["string array of long-term strategies"]
+  },
+  "professionalCare": {
+    "recommended": boolean,
+    "urgencyLevel": "string (Low/Moderate/High)",
+    "recommendation": "string explaining professional care recommendation"
+  }
+}`;
+}
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
+    validateAssessmentData(data);
 
-    const prompt = `
-    As a clinical psychologist, provide a comprehensive mental health assessment based on the following data, using DSM-5 criteria and evidence-based assessment tools:
-
-    Patient Data:
-    Emotional State:
-    - Mood Description: ${data.emotional.mood}
-    - Emotional Intensity: ${data.emotional.intensity}/10
-    - Anxiety Present: ${data.emotional.anxiety}
-    - Mood Swings: ${data.emotional.moodSwings}
+    const result = await queryMistral(constructPrompt(data));
     
-    Cognitive State:
-    - Concentration Level: ${data.cognitive.concentration}/10
-    - Memory Issues: ${data.cognitive.memoryIssues}
-    - Thought Patterns: ${data.cognitive.thoughtPatterns}
+    // Parse and validate the response
+    const parsedResult = JSON.parse(result);
     
-    Behavioral Patterns:
-    - Sleep Quality: ${data.behavioral.sleep}
-    - Social Activity: ${data.behavioral.socialActivity}
-    - Daily Activities: ${data.behavioral.activities.join(', ')}
-
-    Please provide a detailed clinical assessment including:
-
-    1. Clinical Assessment:
-       - Primary symptoms analysis based on DSM-5 criteria
-       - Potential diagnostic considerations for depression, anxiety, and bipolar disorder
-       - Severity assessment using standardized metrics
-       - Risk assessment
-
-    2. Diagnostic Considerations:
-       - Depression indicators (PHQ-9 based)
-       - Anxiety assessment (GAD-7 based)
-       - Bipolar disorder screening (MDQ based)
-       - Other potential concerns
-
-    3. Treatment Recommendations:
-       - Evidence-based therapeutic approaches
-       - Psychotherapy recommendations
-       - Lifestyle modifications
-       - Support system engagement
-       - Crisis resources if needed
-
-    4. Clinical Action Plan:
-       - Immediate interventions needed
-       - Short-term treatment goals
-       - Long-term management strategies
-       - Monitoring recommendations
-
-    5. Professional Support Framework:
-       - Type of mental health professionals needed
-       - Frequency of recommended sessions
-       - Additional assessments needed
-       - Interdisciplinary care considerations
-
-    6. Support Resources:
-       - Clinical support services
-       - Crisis intervention resources
-       - Support groups
-       - Educational materials
-       - Family support recommendations
-
-    Format the response as JSON with these keys:
-    {
-      clinicalAssessment: {
-        primarySymptoms: string[],
-        diagnosticConsiderations: string[],
-        severityLevel: string,
-        riskLevel: string
-      },
-      diagnosticIndications: {
-        depression: {
-          score: number,
-          severity: string,
-          keySymptoms: string[]
-        },
-        anxiety: {
-          score: number,
-          severity: string,
-          keySymptoms: string[]
-        },
-        bipolar: {
-          indicated: boolean,
-          warningSigns: string[]
-        }
-      },
-      treatmentPlan: {
-        immediate: string[],
-        shortTerm: string[],
-        longTerm: string[],
-        therapyApproaches: string[]
-      },
-      professionalCare: {
-        recommendedProviders: string[],
-        sessionFrequency: string,
-        additionalAssessments: string[],
-        urgencyLevel: string
-      },
-      supportResources: {
-        clinical: string[],
-        crisis: string[],
-        support: string[],
-        educational: string[]
-      },
-      followUpCare: {
-        timeline: string,
-        monitoringPlan: string,
-        warningSignsToWatch: string[]
-      }
+    // Validate required sections
+    const requiredSections = [
+      'clinicalAssessment',
+      'diagnosticIndications',
+      'eqDevelopment',
+      'treatmentPlan',
+      'professionalCare'
+    ];
+    
+    const missingSections = requiredSections.filter(section => !parsedResult[section]);
+    if (missingSections.length > 0) {
+      throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
     }
-    
-    Base all assessments on DSM-5 criteria, clinical best practices, and evidence-based treatment guidelines.
-    `;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        { 
-          role: "system", 
-          content: "You are a clinical psychologist with expertise in DSM-5 diagnostics and evidence-based mental health assessments. Provide comprehensive clinical evaluations and treatment recommendations based on established psychological assessment tools and clinical best practices."
-        },
-        { 
-          role: "user", 
-          content: prompt 
-        }
-      ],
-      response_format: { type: "json_object" }
-    });
-
-    const result = JSON.parse(completion.choices[0].message.content);
-    return NextResponse.json(result);
+    return NextResponse.json(parsedResult);
 
   } catch (error) {
     console.error('Assessment error:', error);
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid response format',
+          details: 'Failed to parse assessment results'
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Failed to process clinical assessment' },
+      { 
+        error: 'Assessment failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
