@@ -1,30 +1,106 @@
 import { NextResponse } from 'next/server';
 
-interface AssessmentData {
+interface NIMHANSAssessmentData {
   emotional: {
     mood: string;
     intensity: number;
     anxiety: boolean;
     moodSwings: boolean;
     voiceJournal?: string;
+    energy: number;
+    description: string;
   };
   cognitive: {
     concentration: number;
     memoryIssues: boolean;
     focusIssues: boolean;
     thoughtPatterns: string;
+    decisionMaking: number;
+    clarity: number;
   };
   behavioral: {
     sleep: string;
     sleepHours: number;
     socialActivity: string;
     activities: string[];
+    avoidance: boolean;
+    routineChanges: boolean;
   };
   eqMetrics: {
     selfAwareness: number;
     empathy: number;
     regulation: number;
+    socialSkills: number;
+    motivation: number;
   };
+}
+
+interface AssessmentResult {
+  primary: {
+    category: string;
+    symptoms: string[];
+    severity: string;
+    nimhansClassification: string;
+  };
+  comorbidities: {
+    conditions: Array<{
+      name: string;
+      severity: string;
+      keySymptoms: string[];
+    }>;
+  };
+  psychometricScores: {
+    phq9: number;
+    gad7: number;
+    eqScore: number;
+  };
+  diagnosticIndications: {
+    anxiety: {
+      severity: string;
+      keySymptoms: string[];
+      specificType: string;
+    };
+    depression: {
+      severity: string;
+      keySymptoms: string[];
+      specificType: string;
+    };
+  };
+  eqDevelopment: {
+    strengths: string[];
+    areasForImprovement: string[];
+    exercises: string[];
+  };
+  treatmentPlan: {
+    immediate: string[];
+    longTerm: string[];
+    therapeuticApproaches: string[];
+  };
+  riskAssessment: {
+    level: string;
+    factors: string[];
+    safetyPlan: string[];
+    urgencyOfIntervention: string;
+  };
+  professionalCare: {
+    recommended: boolean;
+    urgencyLevel: string;
+    recommendationType: string;
+    specialistReferral: string[];
+  };
+}
+
+function validateInput(data: any) {
+  if (!data?.currentAssessment) {
+    throw new Error('Current assessment data is required');
+  }
+  
+  const requiredFields = ['emotional', 'cognitive', 'behavioral', 'eqMetrics'];
+  const missingFields = requiredFields.filter(field => !data.currentAssessment[field]);
+  
+  if (missingFields.length > 0) {
+    throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+  }
 }
 
 async function queryMistral(prompt: string) {
@@ -47,159 +123,156 @@ async function queryMistral(prompt: string) {
     }
 
     const data = await response.json();
+    if (!data.response) {
+      throw new Error('Empty response from Mistral');
+    }
+
     return data.response;
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.includes('ECONNREFUSED')) {
+      throw new Error('Unable to connect to Mistral. Please ensure the service is running.');
+    }
     console.error('Mistral API error:', error);
     throw error;
   }
 }
 
-function validateAssessmentData(data: Partial<AssessmentData>): void {
-  if (!data) throw new Error('Assessment data is required');
-  
-  // Initialize missing sections with default values
-  data.emotional = data.emotional || {
-    mood: 'not specified',
-    intensity: 5,
-    anxiety: false,
-    moodSwings: false
-  };
-  
-  data.cognitive = data.cognitive || {
-    concentration: 5,
-    memoryIssues: false,
-    focusIssues: false,
-    thoughtPatterns: 'not specified'
-  };
-
-  data.behavioral = data.behavioral || {
-    sleep: 'not specified',
-    sleepHours: 8,
-    socialActivity: 'not specified',
-    activities: []
-  };
-
-  data.eqMetrics = data.eqMetrics || {
-    selfAwareness: 5,
-    empathy: 5,
-    regulation: 5
-  };
-
-  // Validate data ranges
-  if (data.emotional.intensity !== undefined && 
-      (typeof data.emotional.intensity !== 'number' || 
-       data.emotional.intensity < 0 || 
-       data.emotional.intensity > 10)) {
-    throw new Error('Emotional intensity must be between 0 and 10');
-  }
-
-  if (data.behavioral.sleepHours !== undefined && 
-      (typeof data.behavioral.sleepHours !== 'number' || 
-       data.behavioral.sleepHours < 0 || 
-       data.behavioral.sleepHours > 24)) {
-    throw new Error('Sleep hours must be between 0 and 24');
-  }
-
-  const eqMetrics = ['selfAwareness', 'empathy', 'regulation'] as const;
-  for (const metric of eqMetrics) {
-    const value = data.eqMetrics[metric];
-    if (value !== undefined && 
-        (typeof value !== 'number' || 
-         value < 0 || 
-         value > 10)) {
-      throw new Error(`${metric} must be between 0 and 10`);
-    }
-  }
-}
-
-function constructPrompt(data: AssessmentData): string {
-  return `As an expert clinical psychologist, analyze this mental health assessment data and provide a comprehensive evaluation. Format your response as a specific JSON object.
+function constructNIMHANSPrompt(data: NIMHANSAssessmentData, history: any[]): string {
+  return `As a NIMHANS-trained clinical psychologist, provide a comprehensive mental health evaluation following NIMHANS diagnostic principles:
 
 Assessment Data:
-Emotional State:
-- Mood: ${data.emotional.mood}
-- Intensity: ${data.emotional.intensity}/10
-- Anxiety Present: ${data.emotional.anxiety}
-- Mood Swings: ${data.emotional.moodSwings}
-${data.emotional.voiceJournal ? `- Voice Journal: ${data.emotional.voiceJournal}` : ''}
+${JSON.stringify(data, null, 2)}
 
-Cognitive State:
-- Concentration: ${data.cognitive.concentration}/10
-- Memory Issues: ${data.cognitive.memoryIssues}
-- Focus Issues: ${data.cognitive.focusIssues}
-- Thought Patterns: ${data.cognitive.thoughtPatterns}
+Historical Data (if available):
+${JSON.stringify(history || [], null, 2)}
 
-Behavioral Patterns:
-- Sleep Quality: ${data.behavioral.sleep}
-- Sleep Hours: ${data.behavioral.sleepHours}
-- Social Activity: ${data.behavioral.socialActivity}
-- Activities: ${data.behavioral.activities.join(', ')}
-
-EQ Metrics:
-- Self Awareness: ${data.eqMetrics.selfAwareness}/10
-- Empathy: ${data.eqMetrics.empathy}/10
-- Regulation: ${data.eqMetrics.regulation}/10
+Follow these NIMHANS diagnostic principles:
+1. Use multidisciplinary evaluation approach
+2. Consider biological, psychological, and social factors
+3. Focus on primary conditions and comorbidities
+4. Maintain cultural sensitivity
+5. Reference standardized psychometric tools (PHQ-9, GAD-7, etc.)
 
 Provide your evaluation in this exact JSON format:
 {
-  "clinicalAssessment": {
-    "severityLevel": "string (Low/Moderate/High)",
-    "primarySymptoms": ["string array of main symptoms"]
+  "primary": {
+    "category": "string (Mood/Anxiety/Behavioral/Trauma/Psychosis)",
+    "symptoms": ["string array of primary symptoms"],
+    "severity": "string (Mild/Moderate/Severe)",
+    "nimhansClassification": "string (diagnostic category as per NIMHANS)"
+  },
+  "comorbidities": {
+    "conditions": [{
+      "name": "string (condition name)",
+      "severity": "string (Mild/Moderate/Severe)",
+      "keySymptoms": ["string array of symptoms"]
+    }]
+  },
+  "psychometricScores": {
+    "phq9": number (0-27),
+    "gad7": number (0-21),
+    "eqScore": number (0-100)
   },
   "diagnosticIndications": {
     "anxiety": {
       "severity": "string (Low/Moderate/High)",
-      "keySymptoms": ["string array of anxiety symptoms"]
+      "keySymptoms": ["string array"],
+      "specificType": "string (as per NIMHANS classification)"
     },
     "depression": {
       "severity": "string (Low/Moderate/High)",
-      "keySymptoms": ["string array of depression symptoms"]
+      "keySymptoms": ["string array"],
+      "specificType": "string (as per NIMHANS classification)"
     }
   },
   "eqDevelopment": {
-    "strengths": ["string array of emotional strengths"],
-    "areasForImprovement": ["string array of areas to work on"],
-    "exercises": ["string array of recommended exercises"]
+    "strengths": ["string array"],
+    "areasForImprovement": ["string array"],
+    "exercises": ["string array"]
   },
   "treatmentPlan": {
-    "immediate": ["string array of immediate actions"],
-    "longTerm": ["string array of long-term strategies"]
+    "immediate": ["string array"],
+    "longTerm": ["string array"],
+    "therapeuticApproaches": ["string array of recommended NIMHANS therapy approaches"]
+  },
+  "riskAssessment": {
+    "level": "string (Low/Moderate/High)",
+    "factors": ["string array"],
+    "safetyPlan": ["string array"],
+    "urgencyOfIntervention": "string (Routine/Priority/Urgent)"
   },
   "professionalCare": {
     "recommended": boolean,
     "urgencyLevel": "string (Low/Moderate/High)",
-    "recommendation": "string explaining professional care recommendation"
+    "recommendationType": "string (Outpatient/Intensive Outpatient/Inpatient)",
+    "specialistReferral": ["string array of recommended specialists"]
   }
-}`;
+}
+
+Analyze the provided assessment data thoroughly and ensure the response strictly follows this JSON structure with appropriate clinical insights.`;
 }
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    validateAssessmentData(data);
+    console.log('Received assessment data:', data);
 
-    const result = await queryMistral(constructPrompt(data));
+    // Validate input
+    validateInput(data);
+
+    // Get Mistral response
+    const result = await queryMistral(constructNIMHANSPrompt(data.currentAssessment, data.history));
+    console.log('Raw Mistral response:', result);
     
     // Parse and validate the response
     const parsedResult = JSON.parse(result);
     
-    // Validate required sections
-    const requiredSections = [
-      'clinicalAssessment',
-      'diagnosticIndications',
-      'eqDevelopment',
-      'treatmentPlan',
-      'professionalCare'
-    ];
-    
-    const missingSections = requiredSections.filter(section => !parsedResult[section]);
-    if (missingSections.length > 0) {
-      throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
-    }
+    // Provide default values for missing sections
+    const formattedResult: AssessmentResult = {
+      primary: parsedResult.primary || {
+        category: 'Not specified',
+        symptoms: [],
+        severity: 'Not specified',
+        nimhansClassification: 'Not specified'
+      },
+      comorbidities: parsedResult.comorbidities || { conditions: [] },
+      psychometricScores: parsedResult.psychometricScores || {
+        phq9: 0,
+        gad7: 0,
+        eqScore: 0
+      },
+      diagnosticIndications: parsedResult.diagnosticIndications || {
+        anxiety: { severity: 'Low', keySymptoms: [], specificType: 'Not specified' },
+        depression: { severity: 'Low', keySymptoms: [], specificType: 'Not specified' }
+      },
+      eqDevelopment: parsedResult.eqDevelopment || {
+        strengths: [],
+        areasForImprovement: [],
+        exercises: []
+      },
+      treatmentPlan: parsedResult.treatmentPlan || {
+        immediate: [],
+        longTerm: [],
+        therapeuticApproaches: []
+      },
+      riskAssessment: parsedResult.riskAssessment || {
+        level: 'Low',
+        factors: [],
+        safetyPlan: [],
+        urgencyOfIntervention: 'Routine'
+      },
+      professionalCare: parsedResult.professionalCare || {
+        recommended: false,
+        urgencyLevel: 'Low',
+        recommendationType: 'Not specified',
+        specialistReferral: []
+      }
+    };
 
-    return NextResponse.json(parsedResult);
+    console.log('Formatted result:', formattedResult);
+    return NextResponse.json(formattedResult);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Assessment error:', error);
 
     if (error instanceof SyntaxError) {
@@ -212,10 +285,21 @@ export async function POST(request: Request) {
       );
     }
 
+    if (error.message.includes('ECONNREFUSED')) {
+      return NextResponse.json(
+        { 
+          error: 'Service unavailable',
+          details: 'Unable to connect to assessment service. Please ensure Mistral is running.'
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       { 
         error: 'Assessment failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error?.constructor?.name
       },
       { status: 500 }
     );
