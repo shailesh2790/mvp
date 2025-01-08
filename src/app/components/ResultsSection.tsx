@@ -97,7 +97,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ assessment }) => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">NIMHANS Assessment Results</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Early Diagnostics Assessment Results</h2>
 
       {/* Primary Assessment */}
       <div className="bg-white rounded-lg shadow-lg border-2 border-blue-300 p-6">
@@ -167,13 +167,15 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ assessment }) => {
               </ul>
             </div>
           </div>
+
+          
           
           <div className="mt-4">
-            <h4 className="font-medium text-gray-900 mb-2">Recommended Therapeutic Approaches:</h4>
+            <h4 className="font-medium text-black-900 mb-2">Recommended Therapeutic Approaches:</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {safeMap(assessment.treatmentPlan.therapeuticApproaches, (approach, index) => (
-                <div key={index} className="p-3 bg-red-50 rounded-lg border border-red-200">
-                  {approach}
+                <div key={index} className="text-gray-800">
+                    <p className="text-blue-900 font-medium">{approach}</p>
                 </div>
               ))}
             </div>

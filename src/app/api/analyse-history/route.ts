@@ -16,7 +16,7 @@ interface AnalysisResponse {
 }
 
 async function queryMistral(prompt: string) {
-  const OLLAMA_PORT = process.env.OLLAMA_PORT || '11434';
+  const OLLAMA_PORT = process.env.OLLAMA_PORT || '11435';
   
   try {
     const response = await fetch(`http://localhost:${OLLAMA_PORT}/api/generate`, {

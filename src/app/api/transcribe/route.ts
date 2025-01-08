@@ -1,13 +1,36 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY is not defined');
+async function transcribeAudio(audioBuffer: Buffer) {
+  const OLLAMA_PORT = process.env.OLLAMA_PORT || '11435';
+
+  try {
+    // Convert audio buffer to base64
+    const base64Audio = audioBuffer.toString('base64');
+
+    const response = await fetch(`http://localhost:${OLLAMA_PORT}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "whisper",
+        prompt: "Transcribe this audio",
+        audio: base64Audio,
+        format: "text"
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Whisper API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.response;
+  } catch (error) {
+    console.error('Whisper transcription error:', error);
+    throw error;
+  }
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 export async function POST(request: Request) {
   try {
@@ -15,23 +38,39 @@ export async function POST(request: Request) {
     const audioFile = formData.get('audio') as File;
 
     if (!audioFile) {
-      throw new Error('No audio file provided');
+      return NextResponse.json(
+        { error: 'No audio file provided' },
+        { status: 400 }
+      );
     }
 
+    // Convert audio file to buffer
     const buffer = Buffer.from(await audioFile.arrayBuffer());
     
-    const transcription = await openai.audio.transcriptions.create({
-      file: new File([buffer], 'audio.webm', { type: 'audio/webm' }),
-      model: 'whisper-1',
-      language: 'en'
-    });
+    // Get transcription
+    const transcription = await transcribeAudio(buffer);
 
-    return NextResponse.json({ text: transcription.text });
+    return NextResponse.json({ text: transcription });
 
   } catch (error) {
     console.error('Transcription error:', error);
+    
+    // Handle connection errors
+    if (error.message.includes('ECONNREFUSED')) {
+      return NextResponse.json(
+        { 
+          error: 'Service unavailable',
+          details: 'Unable to connect to the transcription service. Please ensure Ollama is running.'
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Transcription failed', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Transcription failed', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      },
       { status: 500 }
     );
   }
