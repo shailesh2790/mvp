@@ -1,14 +1,11 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { 
-  Brain, 
-  Activity, 
-  Heart, 
-  Mic, 
-  AlertCircle, 
-  TrendingUp 
-} from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { Brain, Activity, Heart, Mic, AlertCircle, TrendingUp } from 'lucide-react';
+import { LogOut } from 'lucide-react';
+
+
 import ResultsSection from './components/ResultsSection';
 
 // Types
@@ -81,17 +78,27 @@ interface AssessmentResult {
 }
 
 export default function Home() {
-  // States
-  const [activeTab, setActiveTab] = useState<string>('emotional');
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [assessment, setAssessment] = useState<AssessmentResult | null>(null);
+
+  const router = useRouter();
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('emotional');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [assessment, setAssessment] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [hasVoicePermission, setHasVoicePermission] = useState(false);
+
 
   
-  // Voice Recording States
-  const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [transcript, setTranscript] = useState<string>('');
   const mediaRecorder = useRef<MediaRecorder | null>(null);
-  const [hasVoicePermission, setHasVoicePermission] = useState<boolean>(false);
+  
+
+  
+  
+
+
+  
 
   // Main Assessment Data
   const [data, setData] = useState<AssessmentData>({
@@ -128,6 +135,33 @@ export default function Home() {
       motivation: 5
     }
   });
+
+  useEffect(() => {
+    const checkAuth = () => {
+      const user = localStorage.getItem('user');
+      if (!user) {
+        router.push('/login');
+      } else {
+        setIsLoading(false);
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+   // Handle logout
+   const handleLogout = () => {
+    localStorage.removeItem('user');
+    router.push('/login');
+  };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+      </div>
+    );
+  }
 
   // Voice Recording Functions
   const getMicPermission = async () => {
@@ -642,12 +676,41 @@ const handleSubmit = async () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-4xl mx-auto p-8">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-xl shadow-xl p-8 mb-8">
-          <h1 className="text-4xl font-bold text-center mb-2">Sukoon</h1>
-          <p className="text-center text-white text-lg">Diagnose, Track mood and enhance your EQ</p>
+  <div className="max-w-4xl mx-auto p-8">
+    {/* Header */}
+    <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-xl shadow-xl p-8 mb-8">
+      <div className="flex flex-col space-y-4">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-2">Sukoon</h1>
+          <p className="text-lg">Diagnose, Track mood and enhance your EQ</p>
         </div>
+        
+        {/* Navigation and Action Buttons */}
+        <div className="flex justify-end items-center gap-4 mt-4">
+          <button
+            onClick={() => router.push('/analytics')}
+            className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
+          >
+            <TrendingUp className="w-4 h-4" />
+            View Analytics
+          </button>
+          
+          <button
+            onClick={() => {
+              localStorage.removeItem('user');
+              router.push('/login');
+            }}
+            className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </button>
+        </div>
+      </div>
+    </div>
+
+  
+    
 
         {/* Navigation Tabs */}
         <div className="flex gap-2 mb-2">

@@ -37,7 +37,7 @@ interface NIMHANSAssessmentData {
 }
 
 // Prompt Construction
-function constructNIMHANSPrompt(data: any, history: any[]): string {
+function constructNIMHANSPrompt(data: NIMHANSAssessmentData, history: any[]): string {
   return `As a NIMHANS-trained clinical psychologist, provide a comprehensive mental health evaluation following NIMHANS diagnostic principles:
 
 Assessment Data:
@@ -172,7 +172,6 @@ async function queryMistral(prompt: string, retries = 3) {
         throw new Error(`Failed after ${retries} attempts: ${error.message}`);
       }
 
-      // Wait before retrying, with exponential backoff
       const waitTime = Math.pow(2, attempt) * 1000;
       console.log(`Waiting ${waitTime}ms before next attempt...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -206,12 +205,11 @@ export async function POST(request: Request) {
     const result = await queryMistral(constructNIMHANSPrompt(data.currentAssessment, data.history));
     console.log('Received response from Mistral');
 
-    // Parse and validate the response
     const parsedResult = JSON.parse(result);
     console.log('Successfully parsed Mistral response');
     
-    // Provide default values for missing sections
     const formattedResult = {
+      timestamp: new Date().toISOString(),
       primary: parsedResult.primary || {
         category: 'Not specified',
         symptoms: [],
