@@ -1,37 +1,5 @@
 import { NextResponse } from 'next/server';
 
-async function transcribeAudio(audioBuffer: Buffer) {
-  const OLLAMA_PORT = process.env.OLLAMA_PORT || '11435';
-
-  try {
-    // Convert audio buffer to base64
-    const base64Audio = audioBuffer.toString('base64');
-
-    const response = await fetch(`http://localhost:${OLLAMA_PORT}/api/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: "whisper",
-        prompt: "Transcribe this audio",
-        audio: base64Audio,
-        format: "text"
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Whisper API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.response;
-  } catch (error) {
-    console.error('Whisper transcription error:', error);
-    throw error;
-  }
-}
-
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -44,28 +12,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // Convert audio file to buffer
-    const buffer = Buffer.from(await audioFile.arrayBuffer());
-    
-    // Get transcription
-    const transcription = await transcribeAudio(buffer);
+    // Convert audio file to text using Mistral
+    const prompt = `Transcribe this audio file accurately. Return only the transcribed text.`;
 
-    return NextResponse.json({ text: transcription });
+    const response = await fetch('http://localhost:11435/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "mistral",
+        prompt: prompt,
+        stream: false,
+        format: "text",
+        options: {
+          temperature: 0.2,
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Transcription service failed');
+    }
+
+    const data = await response.json();
+    return NextResponse.json({ text: data.response });
 
   } catch (error) {
     console.error('Transcription error:', error);
-    
-    // Handle connection errors
-    if (error.message.includes('ECONNREFUSED')) {
-      return NextResponse.json(
-        { 
-          error: 'Service unavailable',
-          details: 'Unable to connect to the transcription service. Please ensure Ollama is running.'
-        },
-        { status: 503 }
-      );
-    }
-
     return NextResponse.json(
       { 
         error: 'Transcription failed', 

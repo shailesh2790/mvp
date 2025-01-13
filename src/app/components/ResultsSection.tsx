@@ -1,13 +1,21 @@
 'use client';
 
 import React from 'react';
-import { Brain, AlertCircle } from 'lucide-react';
+import { Brain, AlertCircle, FileText } from 'lucide-react';
+
+interface ICD10Details {
+  code?: string;
+  description?: string;
+  category?: string;
+  subCategory?: string;
+}
 
 interface PrimaryAssessment {
   severity?: string;
   category?: string;
   nimhansClassification?: string;
   symptoms?: string[];
+  icd10?: ICD10Details;
 }
 
 interface PsychometricScores {
@@ -99,16 +107,48 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ assessment }) => {
     <div className="space-y-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Early Diagnostics Assessment Results</h2>
 
-      {/* Primary Assessment */}
+      {/* Primary Assessment with ICD-10 */}
       <div className="bg-white rounded-lg shadow-lg border-2 border-blue-300 p-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Brain className="text-blue-500" />
           Primary Assessment
         </h3>
-        <div className={`inline-block px-4 py-2 rounded-full font-medium ${getSeverityColor(assessment.primary?.severity)}`}>
-          Severity: {assessment.primary?.severity || 'Not specified'}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <div className={`inline-block px-4 py-2 rounded-full font-medium ${getSeverityColor(assessment.primary?.severity)}`}>
+            Severity: {assessment.primary?.severity || 'Not specified'}
+          </div>
+          {assessment.primary?.icd10?.code && (
+            <div className="inline-block px-4 py-2 rounded-full font-medium bg-purple-100 text-purple-800 border-purple-300">
+              ICD-10: {assessment.primary.icd10.code}
+            </div>
+          )}
         </div>
-        <div className="mt-2 text-gray-700">Category: {assessment.primary?.category || 'Not specified'}</div>
+
+        {/* ICD-10 Details */}
+        {assessment.primary?.icd10 && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-purple-500" />
+              ICD-10 Classification
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Category</p>
+                <p className="text-gray-900">{assessment.primary.icd10.category || 'Not specified'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Sub-category</p>
+                <p className="text-gray-900">{assessment.primary.icd10.subCategory || 'Not specified'}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-gray-600">Description</p>
+                <p className="text-gray-900">{assessment.primary.icd10.description || 'Not specified'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="text-gray-700">Category: {assessment.primary?.category || 'Not specified'}</div>
         <div className="mt-2 text-gray-700">
           NIMHANS Classification: {assessment.primary?.nimhansClassification || 'Not specified'}
         </div>
@@ -167,15 +207,13 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ assessment }) => {
               </ul>
             </div>
           </div>
-
-          
           
           <div className="mt-4">
-            <h4 className="font-medium text-black-900 mb-2">Recommended Therapeutic Approaches:</h4>
+            <h4 className="font-medium text-gray-900 mb-2">Recommended Therapeutic Approaches:</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {safeMap(assessment.treatmentPlan.therapeuticApproaches, (approach, index) => (
                 <div key={index} className="text-gray-800">
-                    <p className="text-blue-900 font-medium">{approach}</p>
+                  <p className="text-blue-900 font-medium">{approach}</p>
                 </div>
               ))}
             </div>

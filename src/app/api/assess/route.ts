@@ -1,123 +1,111 @@
+// app/api/assess/route.ts
 import { NextResponse } from 'next/server';
 
-// Interfaces
-interface NIMHANSAssessmentData {
+interface Assessment {
   emotional: {
-    mood: string;
-    intensity: number;
-    anxiety: boolean;
-    moodSwings: boolean;
-    voiceJournal?: string;
-    energy: number;
-    description: string;
+    mood?: string;
+    intensity?: number;
+    triggers?: string[];
   };
   cognitive: {
-    concentration: number;
-    memoryIssues: boolean;
-    focusIssues: boolean;
-    thoughtPatterns: string;
-    decisionMaking: number;
-    clarity: number;
+    thoughtPatterns?: string[];
+    beliefs?: string[];
+    concerns?: string[];
   };
   behavioral: {
-    sleep: string;
-    sleepHours: number;
-    socialActivity: string;
-    activities: string[];
-    avoidance: boolean;
-    routineChanges: boolean;
+    sleep?: string;
+    activity?: string;
+    social?: string;
   };
   eqMetrics: {
-    selfAwareness: number;
-    empathy: number;
-    regulation: number;
-    socialSkills: number;
-    motivation: number;
+    awareness?: number;
+    regulation?: number;
+    social?: number;
   };
 }
 
-// Prompt Construction
-function constructNIMHANSPrompt(data: NIMHANSAssessmentData, history: any[]): string {
-  return `As a NIMHANS-trained clinical psychologist, provide a comprehensive mental health evaluation following NIMHANS diagnostic principles:
-
-Assessment Data:
-${JSON.stringify(data, null, 2)}
-
-Historical Data (if available):
-${JSON.stringify(history || [], null, 2)}
-
-Follow these NIMHANS diagnostic principles:
-1. Use multidisciplinary evaluation approach
-2. Consider biological, psychological, and social factors
-3. Focus on primary conditions and comorbidities
-4. Maintain cultural sensitivity
-5. Reference standardized psychometric tools (PHQ-9, GAD-7, etc.)
-
-Based on the assessment data, provide a detailed clinical evaluation in the following exact JSON format:
-{
-  "primary": {
-    "category": "string (Mood/Anxiety/Behavioral/Trauma/Psychosis)",
-    "symptoms": ["string array of primary symptoms"],
-    "severity": "string (Mild/Moderate/Severe)",
-    "nimhansClassification": "string (diagnostic category as per NIMHANS)"
-  },
-  "comorbidities": {
-    "conditions": [{
-      "name": "string (condition name)",
-      "severity": "string (Mild/Moderate/Severe)",
-      "keySymptoms": ["string array of symptoms"]
-    }]
-  },
-  "psychometricScores": {
-    "phq9": number (0-27),
-    "gad7": number (0-21),
-    "eqScore": number (0-100)
-  },
-  "diagnosticIndications": {
-    "anxiety": {
-      "severity": "string (Low/Moderate/High)",
-      "keySymptoms": ["string array"],
-      "specificType": "string (as per NIMHANS classification)"
-    },
-    "depression": {
-      "severity": "string (Low/Moderate/High)",
-      "keySymptoms": ["string array"],
-      "specificType": "string (as per NIMHANS classification)"
+function cleanAndParseJSON(str: string) {
+  try {
+    // First attempt: direct parse
+    return JSON.parse(str);
+  } catch (e) {
+    try {
+      // Second attempt: Extract JSON from the response
+      const jsonMatch = str.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      
+      // Third attempt: Clean and try to parse
+      const cleaned = str
+        .replace(/[\n\r\t]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      if (!cleaned.startsWith('{')) {
+        const firstBrace = cleaned.indexOf('{');
+        if (firstBrace !== -1) {
+          return JSON.parse(cleaned.substring(firstBrace));
+        }
+      }
+      
+      throw new Error('Could not extract valid JSON from response');
+    } catch (error) {
+      console.error('Failed to parse response:', str);
+      throw new Error('Invalid JSON format in response');
     }
-  },
-  "eqDevelopment": {
-    "strengths": ["string array"],
-    "areasForImprovement": ["string array"],
-    "exercises": ["string array"]
-  },
-  "treatmentPlan": {
-    "immediate": ["Array of specific immediate actions needed"],
-    "longTerm": ["Array of long-term treatment strategies"],
-    "therapeuticApproaches": [
-      "Detailed therapeutic modalities recommended by NIMHANS",
-      "Specific evidence-based therapy approaches",
-      "Structured intervention techniques",
-      "Recommended counseling methods"
-    ]
-  },
-  "riskAssessment": {
-    "level": "string (Low/Moderate/High)",
-    "factors": ["string array"],
-    "safetyPlan": ["string array"],
-    "urgencyOfIntervention": "string (Routine/Priority/Urgent)"
-  },
-  "professionalCare": {
-    "recommended": boolean,
-    "urgencyLevel": "string (Low/Moderate/High)",
-    "recommendationType": "string (Outpatient/Intensive Outpatient/Inpatient)",
-    "specialistReferral": ["string array of recommended specialists"]
   }
 }
 
-Ensure the response is a valid JSON object following the exact structure above, with appropriate clinical insights based on NIMHANS guidelines.`;
+function constructNIMHANSPrompt(currentAssessment: Assessment, history: any[] = []) {
+  return `You are an expert mental health diagnostic system following NIMHANS (National Institute of Mental Health and Neurosciences) guidelines and ICD-11 criteria. 
+Analyze the following assessment data and provide a comprehensive evaluation.
+
+Current Assessment:
+Emotional State: ${JSON.stringify(currentAssessment.emotional)}
+Cognitive Patterns: ${JSON.stringify(currentAssessment.cognitive)}
+Behavioral Indicators: ${JSON.stringify(currentAssessment.behavioral)}
+EQ Metrics: ${JSON.stringify(currentAssessment.eqMetrics)}
+
+${history?.length > 0 ? `Assessment History:\n${JSON.stringify(history, null, 2)}` : 'No previous history available.'}
+
+Based on this information, provide a comprehensive assessment following NIMHANS guidelines. 
+Include:
+1. Primary diagnosis category
+2. Severity assessment
+3. Key symptoms identified
+4. Treatment recommendations
+5. Professional care requirements
+
+Format your response strictly as JSON following this structure:
+{
+  "primary": {
+    "category": "Specific diagnostic category",
+    "symptoms": ["symptom1", "symptom2"],
+    "severity": "mild/moderate/severe",
+    "nimhansClassification": "Classification code"
+  },
+  "psychometricScores": {
+    "phq9": Number (0-27),
+    "gad7": Number (0-21),
+    "eqScore": Number (0-100)
+  },
+  "treatmentPlan": {
+    "immediate": ["action1", "action2"],
+    "longTerm": ["strategy1", "strategy2"],
+    "therapeuticApproaches": ["approach1", "approach2"]
+  },
+  "professionalCare": {
+    "recommended": boolean,
+    "urgencyLevel": "low/moderate/high",
+    "recommendationType": "type of care recommended",
+    "specialistReferral": ["specialist1", "specialist2"]
+  }
 }
 
-// Mistral Query Function
+Response (in JSON format only):`;
+}
+
 async function queryMistral(prompt: string, retries = 3) {
   const timeout = 60000; // 60 seconds timeout
   
@@ -130,24 +118,18 @@ async function queryMistral(prompt: string, retries = 3) {
       const response = await fetch('http://localhost:11435/api/generate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Connection': 'keep-alive',
-          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           model: "mistral",
           prompt: prompt,
           stream: false,
-          format: "json",
           options: {
-            num_predict: 2048,
-            top_k: 40,
-            top_p: 0.9,
             temperature: 0.7,
+            top_p: 0.9
           }
         }),
-        signal: controller.signal,
-        cache: 'no-store'
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -166,6 +148,7 @@ async function queryMistral(prompt: string, retries = 3) {
       return data.response;
 
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error(`Attempt ${attempt} failed:`, error);
 
       if (attempt === retries) {
@@ -179,34 +162,46 @@ async function queryMistral(prompt: string, retries = 3) {
   }
 }
 
-// Input Validation
-function validateInput(data: any) {
+function validateAssessmentData(data: any) {
   if (!data?.currentAssessment) {
     throw new Error('Current assessment data is required');
   }
-  
+
   const requiredFields = ['emotional', 'cognitive', 'behavioral', 'eqMetrics'];
   const missingFields = requiredFields.filter(field => !data.currentAssessment[field]);
-  
+
   if (missingFields.length > 0) {
     throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
   }
 }
 
-// Main POST Handler
 export async function POST(request: Request) {
   try {
     const data = await request.json();
     console.log('Processing assessment request...');
 
-    validateInput(data);
+    // Validate input data
+    validateAssessmentData(data);
     
     console.log('Sending request to Mistral...');
     const result = await queryMistral(constructNIMHANSPrompt(data.currentAssessment, data.history));
     console.log('Received response from Mistral');
 
-    const parsedResult = JSON.parse(result);
-    console.log('Successfully parsed Mistral response');
+    let parsedResult;
+    try {
+      parsedResult = cleanAndParseJSON(result);
+      console.log('Successfully parsed Mistral response');
+    } catch (error) {
+      console.error('Failed to parse result:', error);
+      console.log('Raw result:', result);
+      return NextResponse.json(
+        { 
+          error: 'Invalid response format',
+          details: 'Failed to parse assessment results'
+        },
+        { status: 500 }
+      );
+    }
     
     const formattedResult = {
       timestamp: new Date().toISOString(),
@@ -216,31 +211,15 @@ export async function POST(request: Request) {
         severity: 'Not specified',
         nimhansClassification: 'Not specified'
       },
-      comorbidities: parsedResult.comorbidities || { conditions: [] },
       psychometricScores: parsedResult.psychometricScores || {
         phq9: 0,
         gad7: 0,
         eqScore: 0
       },
-      diagnosticIndications: parsedResult.diagnosticIndications || {
-        anxiety: { severity: 'Low', keySymptoms: [], specificType: 'Not specified' },
-        depression: { severity: 'Low', keySymptoms: [], specificType: 'Not specified' }
-      },
-      eqDevelopment: parsedResult.eqDevelopment || {
-        strengths: [],
-        areasForImprovement: [],
-        exercises: []
-      },
       treatmentPlan: parsedResult.treatmentPlan || {
         immediate: [],
         longTerm: [],
         therapeuticApproaches: []
-      },
-      riskAssessment: parsedResult.riskAssessment || {
-        level: 'Low',
-        factors: [],
-        safetyPlan: [],
-        urgencyOfIntervention: 'Routine'
       },
       professionalCare: parsedResult.professionalCare || {
         recommended: false,
@@ -250,8 +229,11 @@ export async function POST(request: Request) {
       }
     };
 
-    console.log('Sending formatted response');
-    return NextResponse.json(formattedResult);
+    return NextResponse.json(formattedResult, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate'
+      }
+    });
 
   } catch (error: any) {
     console.error('Assessment error:', error);
@@ -266,11 +248,21 @@ export async function POST(request: Request) {
       );
     }
 
-    if (error.message.includes('ECONNREFUSED') || error.message.includes('Headers Timeout')) {
+    if (error.name === 'AbortError') {
       return NextResponse.json(
         { 
-          error: 'Service temporarily unavailable',
-          details: 'The assessment service is currently busy. Please try again in a moment.'
+          error: 'Request timeout',
+          details: 'The assessment is taking longer than expected. Please try again.'
+        },
+        { status: 504 }
+      );
+    }
+
+    if (error.message.includes('ECONNREFUSED')) {
+      return NextResponse.json(
+        { 
+          error: 'Service unavailable',
+          details: 'Cannot connect to Mistral server. Please ensure it is running.'
         },
         { status: 503 }
       );

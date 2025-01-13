@@ -48,40 +48,69 @@ function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+        {/* Header with improved contrast */}
+        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-lg shadow-lg p-6 mb-8">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Mood Tracking Analytics</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Mood Tracking Analytics</h1>
+              <p className="text-gray-100 mt-2">Track your emotional well-being over time</p>
+            </div>
             <button
               onClick={() => router.push('/')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-6 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-semibold"
             >
               Back to Assessment
             </button>
           </div>
+        </div>
 
+        {/* Charts Section with better visibility */}
+        <div className="space-y-8">
           {/* Mood Trends Chart */}
-          <div className="bg-white p-4 rounded-lg border border-gray-200 mb-8">
-            <h2 className="text-xl font-semibold mb-4">Mood Intensity Trends</h2>
-            <div className="h-[300px]">
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Mood Intensity Trends</h2>
+            <div className="h-[400px]"> {/* Increased height for better visibility */}
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={processedData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#4b5563"
+                    tick={{ fill: '#4b5563', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    stroke="#4b5563"
+                    tick={{ fill: '#4b5563', fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{
+                      fontSize: '14px',
+                      paddingTop: '20px'
+                    }}
+                  />
                   <Line 
                     type="monotone" 
                     dataKey="emotionalIntensity" 
-                    stroke="#8884d8" 
+                    stroke="#6366f1" 
+                    strokeWidth={2}
                     name="Emotional Intensity"
+                    dot={{ stroke: '#6366f1', strokeWidth: 2, r: 4 }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="concentration" 
-                    stroke="#82ca9d" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
                     name="Concentration"
+                    dot={{ stroke: '#10b981', strokeWidth: 2, r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -89,21 +118,42 @@ function AnalyticsPage() {
           </div>
 
           {/* Sleep Pattern Chart */}
-          <div className="bg-white p-4 rounded-lg border border-gray-200">
-            <h2 className="text-xl font-semibold mb-4">Sleep Patterns</h2>
-            <div className="h-[300px]">
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Sleep Patterns</h2>
+            <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={processedData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#4b5563"
+                    tick={{ fill: '#4b5563', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    stroke="#4b5563"
+                    tick={{ fill: '#4b5563', fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{
+                      fontSize: '14px',
+                      paddingTop: '20px'
+                    }}
+                  />
                   <Line 
                     type="monotone" 
                     dataKey="sleepHours" 
-                    stroke="#ffa726" 
+                    stroke="#f59e0b" 
+                    strokeWidth={2}
                     name="Sleep Hours"
+                    dot={{ stroke: '#f59e0b', strokeWidth: 2, r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -114,5 +164,7 @@ function AnalyticsPage() {
     </div>
   );
 }
+
+    
 
 export default AnalyticsPage;

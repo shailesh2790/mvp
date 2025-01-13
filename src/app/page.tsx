@@ -6,6 +6,8 @@ import { Brain, Activity, Heart, Mic, AlertCircle, TrendingUp } from 'lucide-rea
 import { LogOut } from 'lucide-react';
 
 
+
+
 import ResultsSection from './components/ResultsSection';
 
 // Types
@@ -90,15 +92,19 @@ export default function Home() {
   const [hasVoicePermission, setHasVoicePermission] = useState(false);
 
 
-  
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+
+
+
+
   const mediaRecorder = useRef<MediaRecorder | null>(null);
-  
-
-  
-  
 
 
-  
+
+
+
+
+
 
   // Main Assessment Data
   const [data, setData] = useState<AssessmentData>({
@@ -148,8 +154,8 @@ export default function Home() {
     checkAuth();
   }, [router]);
 
-   // Handle logout
-   const handleLogout = () => {
+  // Handle logout
+  const handleLogout = () => {
     localStorage.removeItem('user');
     router.push('/login');
   };
@@ -207,7 +213,7 @@ export default function Home() {
       });
 
       if (!response.ok) throw new Error('Transcription failed');
-      
+
       const { text } = await response.json();
       setTranscript(text);
       setData(prev => ({
@@ -224,34 +230,34 @@ export default function Home() {
   };
 
   // Modify your handleSubmit function
-const handleSubmit = async () => {
-  try {
-    setIsSubmitting(true);
-    console.log('Submitting data:', data); // Debug log
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      console.log('Submitting data:', data); // Debug log
 
-    const response = await fetch('/api/assess', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        currentAssessment: data,
-        history: localStorage.getItem('assessmentHistory')
-      })
-    });
+      const response = await fetch('/api/assess', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentAssessment: data,
+          history: localStorage.getItem('assessmentHistory')
+        })
+      });
 
-    const result = await response.json();
-    console.log('API Response:', result); // Debug log
+      const result = await response.json();
+      console.log('API Response:', result); // Debug log
 
-    if (!response.ok) {
-      throw new Error(result.error || 'Assessment failed');
-    }
-    
-    setAssessment(result);
-    setActiveTab('results');
+      if (!response.ok) {
+        throw new Error(result.error || 'Assessment failed');
+      }
+
+      setAssessment(result);
+      setActiveTab('results');
 
 
-  
+
       // Save to history
       const history = JSON.parse(localStorage.getItem('assessmentHistory') || '[]');
       history.push({
@@ -260,7 +266,7 @@ const handleSubmit = async () => {
         results: result
       });
       localStorage.setItem('assessmentHistory', JSON.stringify(history));
-  
+
     } catch (error) {
       console.error('Submit error:', error);
       alert('Failed to process assessment: ' + (error as Error).message);
@@ -281,23 +287,30 @@ const handleSubmit = async () => {
       </h2>
 
       {/* Voice Journal */}
+
       <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Voice Journal</h3>
         <p className="text-gray-600 mb-4">Express your thoughts and feelings verbally</p>
         <div className="flex items-center gap-4">
           <button
             onClick={isRecording ? stopRecording : startRecording}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors ${
-              isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors ${isRecording
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'bg-blue-500 hover:bg-blue-600'
+              }`}
           >
-            <Mic className={`h-5 w-5 ${isRecording ? 'animate-pulse' : ''}`} />
-            {isRecording ? 'Stop Recording' : 'Start Voice Journal'}
+            {isRecording ? (
+              <>
+                <span className="animate-pulse">●</span> Stop Recording
+              </>
+            ) : (
+              <>
+                <Mic className="h-5 w-5" /> Start Recording
+              </>
+            )}
           </button>
-          {transcript && (
-            <span className="text-green-600 text-sm">Transcription complete!</span>
-          )}
         </div>
+
         {transcript && (
           <div className="mt-4 p-4 bg-white rounded-lg border border-blue-200">
             <h4 className="font-medium text-gray-900 mb-2">Transcribed Journal:</h4>
@@ -305,6 +318,7 @@ const handleSubmit = async () => {
           </div>
         )}
       </div>
+      
 
       {/* Mood Description */}
       <div>
@@ -360,11 +374,10 @@ const handleSubmit = async () => {
                   ...data,
                   emotional: { ...data.emotional, moodSwings: option === 'Yes' }
                 })}
-                className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors ${
-                  data.emotional.moodSwings === (option === 'Yes')
+                className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors ${data.emotional.moodSwings === (option === 'Yes')
                     ? 'bg-blue-700 text-white shadow-md'
                     : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'
-                }`}
+                  }`}
               >
                 {option}
               </button>
@@ -385,11 +398,10 @@ const handleSubmit = async () => {
                   ...data,
                   emotional: { ...data.emotional, anxiety: option === 'Yes' }
                 })}
-                className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors ${
-                  data.emotional.anxiety === (option === 'Yes')
+                className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors ${data.emotional.anxiety === (option === 'Yes')
                     ? 'bg-blue-700 text-white shadow-md'
                     : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'
-                }`}
+                  }`}
               >
                 {option}
               </button>
@@ -659,58 +671,60 @@ const handleSubmit = async () => {
     </div>
   );
 
-  {activeTab === 'results' && assessment && (
-    <div className="bg-white rounded-lg shadow-xl p-6">
-      {/* Debug View */}
-      <div className="mb-4 p-4 bg-gray-100 rounded overflow-auto">
-        <p className="font-bold mb-2">Debug Data:</p>
-        <pre className="text-xs">{JSON.stringify(assessment, null, 2)}</pre>
+  {
+    activeTab === 'results' && assessment && (
+      <div className="bg-white rounded-lg shadow-xl p-6">
+        {/* Debug View */}
+        <div className="mb-4 p-4 bg-gray-100 rounded overflow-auto">
+          <p className="font-bold mb-2">Debug Data:</p>
+          <pre className="text-xs">{JSON.stringify(assessment, null, 2)}</pre>
+        </div>
+        <ResultsSection assessment={assessment} />
       </div>
-      <ResultsSection assessment={assessment} />
-    </div>
-  )}
-         
-  
+    )
+  }
+
+
 
 
 
   return (
     <div className="min-h-screen bg-gray-100">
-  <div className="max-w-4xl mx-auto p-8">
-    {/* Header */}
-    <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-xl shadow-xl p-8 mb-8">
-      <div className="flex flex-col space-y-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-2">Sukoon</h1>
-          <p className="text-lg">Diagnose, Track mood and enhance your EQ</p>
-        </div>
-        
-        {/* Navigation and Action Buttons */}
-        <div className="flex justify-end items-center gap-4 mt-4">
-          <button
-            onClick={() => router.push('/analytics')}
-            className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
-          >
-            <TrendingUp className="w-4 h-4" />
-            View Analytics
-          </button>
-          
-          <button
-            onClick={() => {
-              localStorage.removeItem('user');
-              router.push('/login');
-            }}
-            className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
-        </div>
-      </div>
-    </div>
+      <div className="max-w-4xl mx-auto p-8">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-xl shadow-xl p-8 mb-8">
+          <div className="flex flex-col space-y-4">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold mb-2">Sukoon</h1>
+              <p className="text-lg">Diagnose, Track mood and enhance your EQ</p>
+            </div>
 
-  
-    
+            {/* Navigation and Action Buttons */}
+            <div className="flex justify-end items-center gap-4 mt-4">
+              <button
+                onClick={() => router.push('/analytics')}
+                className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
+              >
+                <TrendingUp className="w-4 h-4" />
+                View Analytics
+              </button>
+
+              <button
+                onClick={() => {
+                  localStorage.removeItem('user');
+                  router.push('/login');
+                }}
+                className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+
+
+
 
         {/* Navigation Tabs */}
         <div className="flex gap-2 mb-2">
@@ -719,8 +733,8 @@ const handleSubmit = async () => {
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-6 py-3 rounded-t-lg font-semibold text-lg capitalize transition-colors
-                ${activeTab === tab 
-                  ? 'bg-white text-blue-700 border-t-4 border-blue-700 shadow-lg' 
+                ${activeTab === tab
+                  ? 'bg-white text-blue-700 border-t-4 border-blue-700 shadow-lg'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-100'}`}
             >
               {tab}
