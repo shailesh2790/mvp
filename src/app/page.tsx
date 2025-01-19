@@ -2,109 +2,79 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Brain, Activity, Heart, Mic, AlertCircle, TrendingUp } from 'lucide-react';
-import { LogOut } from 'lucide-react';
-
-
-
-
+import { Brain, Activity, Heart, Mic, AlertTriangle, TrendingUp, History, LogOut } from 'lucide-react';
 import ResultsSection from './components/ResultsSection';
 
-// Types
-interface EmotionalData {
-  mood: string;
-  intensity: number;
-  moodSwings: boolean;
-  anxiety: boolean;
-  energy: number;
-  description: string;
-  voiceJournal: string;
+interface DynamicQuestion {
+  id: string;
+  text: string;
+  type: 'scale' | 'text' | 'multiSelect' | 'singleSelect' | 'yesNo';
+  options?: string[];
+  category: 'emotional' | 'cognitive' | 'behavioral' | 'eq';
+  subCategory?: string;
+  followUp?: boolean;
+  criteria?: string;
+  response?: any;
 }
 
-interface CognitiveData {
-  concentration: number;
-  focusIssues: boolean;
-  memoryIssues: boolean;
-  thoughtPatterns: string;
-  decisionMaking: number;
-  clarity: number;
-}
-
-interface BehavioralData {
-  sleep: 'good' | 'fair' | 'poor';
-  sleepHours: number;
-  socialActivity: 'normal' | 'reduced' | 'withdrawn' | 'increased';
-  activities: string[];
-  avoidance: boolean;
-  routineChanges: boolean;
-}
-
-interface EQMetrics {
-  selfAwareness: number;
-  empathy: number;
-  regulation: number;
-  socialSkills: number;
-  motivation: number;
+interface QuestionResponse {
+  question: DynamicQuestion;
+  response: any;
 }
 
 interface AssessmentData {
-  emotional: EmotionalData;
-  cognitive: CognitiveData;
-  behavioral: BehavioralData;
-  eqMetrics: EQMetrics;
-}
-
-interface AssessmentResult {
-  primary?: {
-    severity?: string;
-    category?: string;
-    nimhansClassification?: string;
-    symptoms?: string[];
+  emotional: {
+    mood: string;
+    intensity: number;
+    moodSwings: boolean;
+    anxiety: boolean;
+    energy: number;
+    description: string;
+    voiceJournal: string;
   };
-  psychometricScores?: {
-    phq9?: number;
-    gad7?: number;
-    eqScore?: number;
+  cognitive: {
+    concentration: number;
+    focusIssues: boolean;
+    memoryIssues: boolean;
+    thoughtPatterns: string;
+    decisionMaking: number;
+    clarity: number;
   };
-  treatmentPlan?: {
-    immediate?: string[];
-    longTerm?: string[];
-    therapeuticApproaches?: string[];
+  behavioral: {
+    sleep: 'good' | 'fair' | 'poor';
+    sleepHours: number;
+    socialActivity: 'normal' | 'reduced' | 'withdrawn' | 'increased';
+    activities: string[];
+    avoidance: boolean;
+    routineChanges: boolean;
   };
-  professionalCare?: {
-    recommended?: boolean;
-    recommendationType?: string;
-    urgencyLevel?: string;
-    specialistReferral?: string[];
+  eqMetrics: {
+    selfAwareness: number;
+    empathy: number;
+    regulation: number;
+    socialSkills: number;
+    motivation: number;
   };
 }
 
 export default function Home() {
-
   const router = useRouter();
-
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('emotional');
+  const [rangeValue, setRangeValue] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [assessment, setAssessment] = useState(null);
+  const [assessment, setAssessment] = useState<any>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<DynamicQuestion | null>(null);
+  const [previousResponses, setPreviousResponses] = useState<Array<{
+    question: DynamicQuestion;
+    response: any;
+  }>>([]);
+  const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [showInitialForm, setShowInitialForm] = useState(true);
+
+  // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [hasVoicePermission, setHasVoicePermission] = useState(false);
-
-
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-
-
-
-
   const mediaRecorder = useRef<MediaRecorder | null>(null);
-
-
-
-
-
-
-
 
   // Main Assessment Data
   const [data, setData] = useState<AssessmentData>({
@@ -143,97 +113,122 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const checkAuth = () => {
+    const initializeAssessment = async () => {
       const user = localStorage.getItem('user');
       if (!user) {
         router.push('/login');
-      } else {
+        return;
+      }
+
+      try {
+        const history = localStorage.getItem('assessmentHistory');
+        if (history) {
+          setHistoricalData(JSON.parse(history));
+        }
+      } catch (error) {
+        console.error('Error loading history:', error);
+      } finally {
         setIsLoading(false);
       }
     };
-    checkAuth();
+
+    initializeAssessment();
   }, [router]);
 
-  // Handle logout
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    router.push('/login');
-  };
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-      </div>
-    );
-  }
-
-  // Voice Recording Functions
-  const getMicPermission = async () => {
+  const startAssessment = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: true
-      });
-      setHasVoicePermission(true);
-      return mediaStream;
-    } catch (err) {
-      alert('Please enable your microphone to use voice journaling');
-      return null;
-    }
-  };
+      setIsSubmitting(true);
+      setShowInitialForm(false);
 
-  const startRecording = async () => {
-    const stream = await getMicPermission();
-    if (!stream) return;
-
-    mediaRecorder.current = new MediaRecorder(stream);
-    mediaRecorder.current.ondataavailable = async (event) => {
-      if (event.data.size > 0) {
-        await convertSpeechToText(event.data);
-      }
-    };
-    mediaRecorder.current.start();
-    setIsRecording(true);
-  };
-
-  const stopRecording = () => {
-    mediaRecorder.current?.stop();
-    setIsRecording(false);
-  };
-
-  const convertSpeechToText = async (audioBlob: Blob) => {
-    try {
-      const formData = new FormData();
-      formData.append('audio', audioBlob);
-
-      const response = await fetch('/api/transcribe', {
+      const response = await fetch('/api/next-question', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentQuestion: null,
+          currentResponse: null,
+          previousResponses: [],
+          history: historicalData
+        })
       });
 
-      if (!response.ok) throw new Error('Transcription failed');
+      if (!response.ok) {
+        throw new Error('Failed to start assessment');
+      }
 
-      const { text } = await response.json();
-      setTranscript(text);
-      setData(prev => ({
-        ...prev,
-        emotional: {
-          ...prev.emotional,
-          voiceJournal: text
-        }
-      }));
+      const result = await response.json();
+      
+      if (result.complete) {
+        await handleSubmit();
+      } else {
+        setCurrentQuestion(result.question);
+      }
     } catch (error) {
-      console.error('Speech to text error:', error);
-      alert('Failed to transcribe audio. Please try again.');
+      console.error('Failed to start assessment:', error);
+      alert('Failed to start assessment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Modify your handleSubmit function
+  const handleQuestionResponse = async (response: any) => {
+    try {
+      if (!currentQuestion) return;
+
+      // Update current question's response
+      const updatedQuestion = {
+        ...currentQuestion,
+        response: response
+      };
+
+      const updatedResponses = [...previousResponses, {
+        question: updatedQuestion,
+        response: response
+      }];
+
+      setPreviousResponses(updatedResponses);
+
+      const nextQuestionResponse = await fetch('/api/next-question', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentQuestion: updatedQuestion,
+          currentResponse: response,
+          previousResponses: updatedResponses,
+          history: historicalData
+        })
+      });
+
+      if (!nextQuestionResponse.ok) {
+        throw new Error('Failed to get next question');
+      }
+
+      const result = await nextQuestionResponse.json();
+
+      if (result.complete) {
+        await handleSubmit();
+      } else {
+        // Reset range value for new questions
+        if (result.question.type === 'scale') {
+          setRangeValue(5);
+        }
+        setCurrentQuestion(result.question);
+      }
+    } catch (error) {
+      console.error('Response handling error:', error);
+      await handleSubmit();
+    }
+};
+
+
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
-      console.log('Submitting data:', data); // Debug log
+      setCurrentQuestion(null);
 
       const response = await fetch('/api/assess', {
         method: 'POST',
@@ -242,62 +237,113 @@ export default function Home() {
         },
         body: JSON.stringify({
           currentAssessment: data,
-          history: localStorage.getItem('assessmentHistory')
+          responses: previousResponses,
+          history: historicalData
         })
       });
 
-      const result = await response.json();
-      console.log('API Response:', result); // Debug log
-
       if (!response.ok) {
-        throw new Error(result.error || 'Assessment failed');
+        throw new Error('Assessment failed');
       }
 
-      setAssessment(result);
-      setActiveTab('results');
+      const result = await response.json();
+      
+      if (result.success && result.assessment) {
+        setAssessment(result.assessment);
 
-
-
-      // Save to history
-      const history = JSON.parse(localStorage.getItem('assessmentHistory') || '[]');
-      history.push({
-        date: new Date().toISOString(),
-        data,
-        results: result
-      });
-      localStorage.setItem('assessmentHistory', JSON.stringify(history));
+        // Save to history
+        const newHistory = [
+          ...historicalData,
+          {
+            date: new Date().toISOString(),
+            data: data,
+            responses: previousResponses,
+            assessment: result.assessment
+          }
+        ];
+        
+        setHistoricalData(newHistory);
+        localStorage.setItem('assessmentHistory', JSON.stringify(newHistory));
+      } else {
+        throw new Error(result.error || 'Failed to generate assessment');
+      }
 
     } catch (error) {
       console.error('Submit error:', error);
-      alert('Failed to process assessment: ' + (error as Error).message);
+      alert('Assessment failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Render Functions
-  // Render Functions
-  const renderEmotionalAssessment = () => (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        <div className="flex items-center gap-2">
-          <Heart className="text-red-500" />
-          Emotional Assessment
-        </div>
-      </h2>
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder.current = new MediaRecorder(stream);
+      
+      mediaRecorder.current.ondataavailable = async (event) => {
+        if (event.data.size > 0) {
+          await handleAudioData(event.data);
+        }
+      };
 
-      {/* Voice Journal */}
+      mediaRecorder.current.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Recording error:', error);
+      alert('Could not access microphone');
+    }
+  };
 
+  const stopRecording = () => {
+    if (mediaRecorder.current && isRecording) {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleAudioData = async (blob: Blob) => {
+    try {
+      const formData = new FormData();
+      formData.append('audio', blob);
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Transcription failed');
+      }
+
+      const { text } = await response.json();
+      setTranscript(text);
+      
+      setData(prev => ({
+        ...prev,
+        emotional: {
+          ...prev.emotional,
+          voiceJournal: text
+        }
+      }));
+    } catch (error) {
+      console.error('Audio processing error:', error);
+      alert('Failed to process audio recording');
+    }
+  };
+
+  // Render functions
+  const renderInitialForm = () => (
+    <div className="space-y-6">
       <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Voice Journal</h3>
         <p className="text-gray-600 mb-4">Express your thoughts and feelings verbally</p>
         <div className="flex items-center gap-4">
           <button
             onClick={isRecording ? stopRecording : startRecording}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors ${isRecording
-                ? 'bg-red-500 hover:bg-red-600'
-                : 'bg-blue-500 hover:bg-blue-600'
-              }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors
+              ${isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
           >
             {isRecording ? (
               <>
@@ -318,28 +364,28 @@ export default function Home() {
           </div>
         )}
       </div>
-      
 
-      {/* Mood Description */}
       <div>
         <label className="block text-lg font-semibold text-gray-900 mb-2">
-          How would you describe your mood today?
+          How would you describe your current emotional state?
         </label>
         <textarea
-          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 min-h-[100px] text-gray-900 text-lg bg-white shadow-inner"
-          placeholder="Describe your current emotional state..."
-          value={data.emotional.mood}
-          onChange={(e) => setData({
-            ...data,
-            emotional: { ...data.emotional, mood: e.target.value }
-          })}
+          value={data.emotional.description}
+          onChange={(e) => setData(prev => ({
+            ...prev,
+            emotional: { ...prev.emotional, description: e.target.value }
+          }))}
+          className="w-full p-4 border-2 border-gray-300 rounded-lg 
+            focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 
+            min-h-[120px] text-gray-800 bg-white shadow-sm hover:border-blue-300
+            transition-all duration-200"
+          placeholder="Describe how you're feeling..."
         />
       </div>
 
-      {/* Emotional Intensity */}
       <div>
         <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Emotional Intensity (1-10)
+          Rate your current mood (1-10)
         </label>
         <div className="flex items-center gap-4">
           <input
@@ -347,344 +393,157 @@ export default function Home() {
             min="1"
             max="10"
             value={data.emotional.intensity}
-            onChange={(e) => setData({
-              ...data,
-              emotional: { ...data.emotional, intensity: parseInt(e.target.value) }
-            })}
+            onChange={(e) => setData(prev => ({
+              ...prev,
+              emotional: { ...prev.emotional, intensity: parseInt(e.target.value) }
+            }))}
             className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
           />
-          <span className="text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-blue-200">
+          <span className="text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg min-w-[3rem] text-center">
             {data.emotional.intensity}
           </span>
         </div>
       </div>
 
-      {/* Additional Emotional Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Mood Swings */}
-        <div>
-          <label className="block text-lg font-semibold text-gray-900 mb-2">
-            Experiencing mood swings?
-          </label>
-          <div className="flex gap-4">
-            {['Yes', 'No'].map((option) => (
-              <button
-                key={option}
-                onClick={() => setData({
-                  ...data,
-                  emotional: { ...data.emotional, moodSwings: option === 'Yes' }
-                })}
-                className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors ${data.emotional.moodSwings === (option === 'Yes')
-                    ? 'bg-blue-700 text-white shadow-md'
-                    : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'
-                  }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        </div>
+      <button
+        onClick={startAssessment}
+        disabled={isSubmitting || !data.emotional.description}
+        className={`w-full px-8 py-4 bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-lg
+          hover:from-blue-800 hover:to-blue-950 transition-colors font-semibold text-lg
+          ${(isSubmitting || !data.emotional.description) ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        {isSubmitting ? 'Starting Assessment...' : 'Begin Assessment'}
+      </button>
+    </div>
+  );
 
-        {/* Anxiety Check */}
-        <div>
-          <label className="block text-lg font-semibold text-gray-900 mb-2">
-            Feeling anxious?
-          </label>
-          <div className="flex gap-4">
-            {['Yes', 'No'].map((option) => (
-              <button
-                key={option}
-                onClick={() => setData({
-                  ...data,
-                  emotional: { ...data.emotional, anxiety: option === 'Yes' }
-                })}
-                className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors ${data.emotional.anxiety === (option === 'Yes')
-                    ? 'bg-blue-700 text-white shadow-md'
-                    : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'
-                  }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+  const renderDynamicQuestion = () => {
+    if (!currentQuestion) return null;
 
-      {/* EQ Self-Assessment */}
-      <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Emotional Intelligence Check</h3>
-        <div className="space-y-6">
-          {[
-            { key: 'selfAwareness', label: 'Self-Awareness Level' },
-            { key: 'empathy', label: 'Empathy Level' },
-            { key: 'regulation', label: 'Emotional Regulation' },
-          ].map((metric) => (
-            <div key={metric.key}>
-              <label className="block text-md font-medium text-gray-800 mb-2">
-                {metric.label} (1-10)
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={data.eqMetrics[metric.key]}
-                  onChange={(e) => setData({
-                    ...data,
-                    eqMetrics: {
-                      ...data.eqMetrics,
-                      [metric.key]: parseInt(e.target.value)
-                    }
-                  })}
-                  className="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer"
+    const handleRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = parseInt(e.target.value);
+        setRangeValue(value);
+        handleQuestionResponse(value);
+    };
+    
+    return (
+        <div className="p-6 bg-white rounded-lg shadow-lg border-2 border-gray-200">
+            {/* Follow-up Question Indicator */}
+            {currentQuestion.followUp && (
+                <div className="mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-600 flex items-center gap-2">
+                        <Brain className="h-4 w-4" />
+                        Follow-up Question
+                    </p>
+                </div>
+            )}
+
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">{currentQuestion.text}</h3>
+            
+            {currentQuestion.type === 'scale' && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={rangeValue}
+                            onChange={handleRangeChange}
+                            className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-2xl font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg min-w-[3rem] text-center">
+                            {rangeValue}
+                        </span>
+                    </div>
+                </div>
+            )}
+            
+            {currentQuestion.type === 'multiSelect' && currentQuestion.options && (
+                <div className="space-y-3">
+                    {currentQuestion.options.map((option) => (
+                        <label
+                            key={option}
+                            className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:bg-blue-50 cursor-pointer transition-all duration-200"
+                        >
+                            <input
+                                type="checkbox"
+                                onChange={(e) => {
+                                    const currentSelection = Array.isArray(currentQuestion.response) 
+                                        ? currentQuestion.response 
+                                        : [];
+                                    const updatedSelection = e.target.checked
+                                        ? [...currentSelection, option]
+                                        : currentSelection.filter(item => item !== option);
+                                    handleQuestionResponse(updatedSelection);
+                                }}
+                                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-900">{option}</span>
+                        </label>
+                    ))}
+                </div>
+            )}
+            
+            {currentQuestion.type === 'yesNo' && (
+                <div className="flex gap-4">
+                    {['Yes', 'No'].map((option) => (
+                        <button
+                            key={option}
+                            onClick={() => handleQuestionResponse(option === 'Yes')}
+                            className="flex-1 py-4 px-6 rounded-lg font-medium transition-colors hover:bg-blue-50 border-2 border-gray-200 text-gray-900"
+                        >
+                            {option}
+                        </button>
+                    ))}
+                </div>
+            )}
+            
+            {currentQuestion.type === 'singleSelect' && currentQuestion.options && (
+                <div className="space-y-3">
+                    {currentQuestion.options.map((option) => (
+                        <button
+                            key={option}
+                            onClick={() => handleQuestionResponse(option)}
+                            className="w-full p-4 text-left rounded-lg font-medium transition-colors hover:bg-blue-50 border-2 border-gray-200 text-gray-900"
+                        >
+                            {option}
+                        </button>
+                    ))}
+                </div>
+            )}
+            
+            {currentQuestion.type === 'text' && (
+                <textarea
+                    onChange={(e) => handleQuestionResponse(e.target.value)}
+                    className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 min-h-[120px] text-gray-800 bg-white shadow-sm hover:border-blue-300 transition-all duration-200"
+                    placeholder="Type your response here..."
                 />
-                <span className="text-xl font-bold text-purple-700 bg-purple-100 px-3 py-1 rounded-lg min-w-[2.5rem] text-center">
-                  {data.eqMetrics[metric.key]}
+            )}
+            
+            {/* Question Progress and Category */}
+            <div className="mt-6 flex items-center justify-between text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                    <span>Question {previousResponses.length + 1}</span>
+                    {currentQuestion.followUp && (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                            Follow-up
+                        </span>
+                    )}
+                </div>
+                <span className="flex items-center gap-2">
+                    {currentQuestion.category === 'emotional' && <Heart className="h-4 w-4" />}
+                    {currentQuestion.category === 'cognitive' && <Brain className="h-4 w-4" />}
+                    {currentQuestion.category === 'behavioral' && <Activity className="h-4 w-4" />}
+                    {currentQuestion.category === 'eq' && <Brain className="h-4 w-4" />}
+                    {currentQuestion.category.charAt(0).toUpperCase() + currentQuestion.category.slice(1)} Assessment
                 </span>
-              </div>
             </div>
-          ))}
         </div>
-      </div>
-    </div>
-  );
-
-  const renderCognitiveAssessment = () => (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        <div className="flex items-center gap-2">
-          <Brain className="text-purple-500" />
-          Cognitive Assessment
-        </div>
-      </h2>
-
-      {/* Concentration Level */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Concentration Level (1-10)
-        </label>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={data.cognitive.concentration}
-            onChange={(e) => setData({
-              ...data,
-              cognitive: { ...data.cognitive, concentration: parseInt(e.target.value) }
-            })}
-            className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
-          <span className="text-2xl font-bold text-purple-700 bg-purple-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-purple-200">
-            {data.cognitive.concentration}
-          </span>
-        </div>
-      </div>
-
-      {/* Memory Issues */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Experiencing memory issues?
-        </label>
-        <div className="flex gap-4">
-          {['Yes', 'No'].map((option) => (
-            <button
-              key={option}
-              onClick={() => setData({
-                ...data,
-                cognitive: { ...data.cognitive, memoryIssues: option === 'Yes' }
-              })}
-              className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors
-                ${data.cognitive.memoryIssues === (option === 'Yes')
-                  ? 'bg-purple-700 text-white shadow-md'
-                  : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'}`}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Focus Issues */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Having trouble focusing?
-        </label>
-        <div className="flex gap-4">
-          {['Yes', 'No'].map((option) => (
-            <button
-              key={option}
-              onClick={() => setData({
-                ...data,
-                cognitive: { ...data.cognitive, focusIssues: option === 'Yes' }
-              })}
-              className={`px-8 py-4 rounded-lg text-lg font-medium transition-colors
-                ${data.cognitive.focusIssues === (option === 'Yes')
-                  ? 'bg-purple-700 text-white shadow-md'
-                  : 'bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-300'}`}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Thought Patterns */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Describe any recurring thoughts
-        </label>
-        <textarea
-          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 min-h-[100px] text-gray-900 text-lg bg-white shadow-inner"
-          placeholder="Describe any thoughts that keep coming back..."
-          value={data.cognitive.thoughtPatterns}
-          onChange={(e) => setData({
-            ...data,
-            cognitive: { ...data.cognitive, thoughtPatterns: e.target.value }
-          })}
-        />
-      </div>
-
-      {/* Mental Clarity */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Mental Clarity (1-10)
-        </label>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={data.cognitive.clarity}
-            onChange={(e) => setData({
-              ...data,
-              cognitive: { ...data.cognitive, clarity: parseInt(e.target.value) }
-            })}
-            className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
-          <span className="text-2xl font-bold text-purple-700 bg-purple-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-purple-200">
-            {data.cognitive.clarity}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderBehavioralAssessment = () => (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        <div className="flex items-center gap-2">
-          <Activity className="text-green-500" />
-          Behavioral Assessment
-        </div>
-      </h2>
-
-      {/* Sleep Quality */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Sleep Quality
-        </label>
-        <select
-          value={data.behavioral.sleep}
-          onChange={(e) => setData({
-            ...data,
-            behavioral: { ...data.behavioral, sleep: e.target.value as 'good' | 'fair' | 'poor' }
-          })}
-          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 text-gray-900 text-lg bg-white shadow-inner"
-        >
-          <option value="good">Good</option>
-          <option value="fair">Fair</option>
-          <option value="poor">Poor</option>
-        </select>
-      </div>
-
-      {/* Sleep Hours */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Hours of Sleep
-        </label>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min="0"
-            max="12"
-            value={data.behavioral.sleepHours}
-            onChange={(e) => setData({
-              ...data,
-              behavioral: { ...data.behavioral, sleepHours: parseInt(e.target.value) }
-            })}
-            className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
-          <span className="text-2xl font-bold text-green-700 bg-green-50 px-4 py-2 rounded-lg min-w-[3rem] text-center border-2 border-green-200">
-            {data.behavioral.sleepHours}h
-          </span>
-        </div>
-      </div>
-
-      {/* Social Activity Level */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Social Activity Level
-        </label>
-        <select
-          value={data.behavioral.socialActivity}
-          onChange={(e) => setData({
-            ...data,
-            behavioral: { ...data.behavioral, socialActivity: e.target.value as 'normal' | 'reduced' | 'withdrawn' | 'increased' }
-          })}
-          className="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 text-gray-900 text-lg bg-white shadow-inner"
-        >
-          <option value="normal">Normal</option>
-          <option value="reduced">Reduced</option>
-          <option value="withdrawn">Withdrawn</option>
-          <option value="increased">Increased</option>
-        </select>
-      </div>
-
-      {/* Daily Activities */}
-      <div>
-        <label className="block text-lg font-semibold text-gray-900 mb-2">
-          Daily Activities
-        </label>
-        <div className="space-y-3">
-          {['Exercise', 'Work/Study', 'Hobbies', 'Social Interaction', 'Self-Care'].map(activity => (
-            <label key={activity} className="flex items-center gap-3 p-4 border-2 border-gray-300 rounded-lg hover:bg-green-50 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={data.behavioral.activities.includes(activity)}
-                onChange={(e) => {
-                  const newActivities = e.target.checked
-                    ? [...data.behavioral.activities, activity]
-                    : data.behavioral.activities.filter(a => a !== activity);
-                  setData({
-                    ...data,
-                    behavioral: { ...data.behavioral, activities: newActivities }
-                  });
-                }}
-                className="w-5 h-5 rounded border-gray-400 text-green-600 focus:ring-green-500"
-              />
-              <span className="text-gray-900 text-lg">{activity}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  {
-    activeTab === 'results' && assessment && (
-      <div className="bg-white rounded-lg shadow-xl p-6">
-        {/* Debug View */}
-        <div className="mb-4 p-4 bg-gray-100 rounded overflow-auto">
-          <p className="font-bold mb-2">Debug Data:</p>
-          <pre className="text-xs">{JSON.stringify(assessment, null, 2)}</pre>
-        </div>
-        <ResultsSection assessment={assessment} />
-      </div>
-    )
-  }
+    );
+};
 
 
+ 
 
 
 
@@ -693,28 +552,27 @@ export default function Home() {
       <div className="max-w-4xl mx-auto p-8">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-xl shadow-xl p-8 mb-8">
-          <div className="flex flex-col space-y-4">
-            <div className="text-center">
+          <div className="flex justify-between items-center">
+            <div>
               <h1 className="text-4xl font-bold mb-2">Sukoon</h1>
-              <p className="text-lg">Diagnose, Track mood and enhance your EQ</p>
+              <p className="text-lg">Mental Health Assessment</p>
             </div>
-
-            {/* Navigation and Action Buttons */}
-            <div className="flex justify-end items-center gap-4 mt-4">
+            <div className="flex gap-4">
               <button
                 onClick={() => router.push('/analytics')}
-                className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 
+                  transition-colors font-medium flex items-center gap-2"
               >
                 <TrendingUp className="w-4 h-4" />
-                View Analytics
+                Analytics
               </button>
-
               <button
                 onClick={() => {
                   localStorage.removeItem('user');
                   router.push('/login');
                 }}
-                className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 transition-colors font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-white text-blue-900 rounded-lg hover:bg-gray-100 
+                  transition-colors font-medium flex items-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
                 Logout
@@ -723,73 +581,38 @@ export default function Home() {
           </div>
         </div>
 
-
-
-
-        {/* Navigation Tabs */}
-        <div className="flex gap-2 mb-2">
-          {['emotional', 'cognitive', 'behavioral', ...(assessment ? ['results'] : [])].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 rounded-t-lg font-semibold text-lg capitalize transition-colors
-                ${activeTab === tab
-                  ? 'bg-white text-blue-700 border-t-4 border-blue-700 shadow-lg'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-100'}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Main Content Area */}
+        {/* Main Content */}
         <div className="bg-white rounded-lg shadow-xl border-2 border-gray-300 p-8">
-          {activeTab === 'emotional' && renderEmotionalAssessment()}
-          {activeTab === 'cognitive' && renderCognitiveAssessment()}
-          {activeTab === 'behavioral' && renderBehavioralAssessment()}
-          {activeTab === 'results' && assessment && (
-            <div className="bg-white rounded-lg shadow-xl p-6">
-              <ResultsSection assessment={assessment} />
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700" />
             </div>
+          ) : (
+            <>
+              {showInitialForm && !assessment ? (
+                renderInitialForm()
+              ) : currentQuestion ? (
+                renderDynamicQuestion()
+              ) : assessment ? (
+                <ResultsSection 
+                  assessment={assessment}
+                  history={historicalData}
+                />
+              ) : null}
+            </>
           )}
-
-          {/* Navigation Buttons */}
-          <div className="flex justify-between mt-6">
-            {activeTab !== 'emotional' && activeTab !== 'results' && (
-              <button
-                onClick={() => setActiveTab(prev => prev === 'behavioral' ? 'cognitive' : 'emotional')}
-                className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Previous
-              </button>
-            )}
-            {activeTab !== 'behavioral' && activeTab !== 'results' ? (
-              <button
-                onClick={() => setActiveTab(prev => prev === 'emotional' ? 'cognitive' : 'behavioral')}
-                className="px-6 py-3 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors ml-auto"
-              >
-                Next
-              </button>
-            ) : activeTab === 'behavioral' ? (
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className={`px-8 py-4 bg-gradient-to-r from-blue-700 to-blue-900 text-white rounded-lg 
-                  hover:from-blue-800 hover:to-blue-950 transition-colors font-semibold text-lg ml-auto 
-                  shadow-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isSubmitting ? 'Processing Assessment...' : 'Get NIMHANS Assessment'}
-              </button>
-            ) : null}
-          </div>
         </div>
 
         {/* Loading Overlay */}
         {isSubmitting && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center 
+            justify-center z-50">
             <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full mx-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700 mx-auto" />
-              <p className="mt-4 text-center text-gray-700">Analyzing your responses...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 
+                border-blue-700 mx-auto" />
+              <p className="mt-4 text-center text-gray-700">
+                {assessment ? 'Processing Assessment...' : 'Starting Assessment...'}
+              </p>
             </div>
           </div>
         )}

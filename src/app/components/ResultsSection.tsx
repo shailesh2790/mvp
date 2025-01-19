@@ -1,253 +1,182 @@
 'use client';
 
-import React from 'react';
-import { Brain, AlertCircle, FileText } from 'lucide-react';
-
-interface ICD10Details {
-  code?: string;
-  description?: string;
-  category?: string;
-  subCategory?: string;
-}
-
-interface PrimaryAssessment {
-  severity?: string;
-  category?: string;
-  nimhansClassification?: string;
-  symptoms?: string[];
-  icd10?: ICD10Details;
-}
-
-interface PsychometricScores {
-  phq9?: number;
-  gad7?: number;
-  eqScore?: number;
-}
-
-interface TreatmentPlan {
-  immediate?: string[];
-  longTerm?: string[];
-  therapeuticApproaches?: string[];
-}
-
-interface ProfessionalCare {
-  recommended?: boolean;
-  recommendationType?: string;
-  urgencyLevel?: string;
-  specialistReferral?: string[];
-}
-
-interface AssessmentResult {
-  primary?: PrimaryAssessment;
-  psychometricScores?: PsychometricScores;
-  treatmentPlan?: TreatmentPlan;
-  professionalCare?: ProfessionalCare;
-}
+import { Brain, Activity, AlertTriangle, Heart, Stethoscope, FileText, ListChecks } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 interface ResultsSectionProps {
-  assessment: AssessmentResult;
+  assessment: any; // We'll keep it as any for now to debug
 }
 
-const safeMap = (arr: any[] | undefined, fn: (item: any, index: number) => React.ReactNode) => {
-  return arr?.map(fn) || [];
-};
+const ResultsSection = ({ assessment }: ResultsSectionProps) => {
+  if (!assessment) return null;
 
-const ResultsSection: React.FC<ResultsSectionProps> = ({ assessment }) => {
-  const getSeverityColor = (severity?: string) => {
-    switch (severity?.toLowerCase()) {
+  const getSeverityColor = (severity: string = 'moderate') => {
+    switch (severity.toLowerCase()) {
       case 'severe': return 'bg-red-100 text-red-800 border-red-300';
       case 'moderate': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'mild': return 'bg-blue-100 text-blue-800 border-blue-300';
-      default: return 'bg-green-100 text-green-800 border-green-300';
+      case 'mild': return 'bg-green-100 text-green-800 border-green-300';
+      default: return 'bg-blue-100 text-blue-800 border-blue-300';
     }
   };
 
-  const getRiskLevelColor = (level?: string) => {
-    switch (level?.toLowerCase()) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'moderate': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const getProgressColor = (score: number = 5) => {
+    if (score >= 7) return 'bg-green-500';
+    if (score >= 5) return 'bg-yellow-500';
+    return 'bg-red-500';
   };
 
-  const getScoreColor = (type: string, score?: number) => {
-    if (score === undefined) return 'text-gray-600';
-    
-    switch(type) {
-      case 'phq9':
-        if (score <= 4) return 'text-green-600';
-        if (score <= 9) return 'text-yellow-600';
-        if (score <= 14) return 'text-orange-600';
-        return 'text-red-600';
-      case 'gad7':
-        if (score <= 4) return 'text-green-600';
-        if (score <= 9) return 'text-yellow-600';
-        if (score <= 14) return 'text-orange-600';
-        return 'text-red-600';
-      case 'eq':
-        if (score >= 80) return 'text-green-600';
-        if (score >= 60) return 'text-yellow-600';
-        if (score >= 40) return 'text-orange-600';
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
+  // Safely access nested properties
+  const scores = assessment.scores || {};
+  const clinicalSummary = assessment.clinicalSummary || {};
+  const recommendations = assessment.recommendations || {};
 
-  if (!assessment || !assessment.primary) {
-    return (
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-yellow-700">Assessment data is not available.</p>
-      </div>
-    );
-  }
+  // Debug log
+  console.log('Assessment data:', {
+    scores,
+    clinicalSummary,
+    recommendations
+  });
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Early Diagnostics Assessment Results</h2>
-
-      {/* Primary Assessment with ICD-10 */}
-      <div className="bg-white rounded-lg shadow-lg border-2 border-blue-300 p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Brain className="text-blue-500" />
-          Primary Assessment
-        </h3>
-        <div className="flex flex-wrap gap-3 mb-4">
-          <div className={`inline-block px-4 py-2 rounded-full font-medium ${getSeverityColor(assessment.primary?.severity)}`}>
-            Severity: {assessment.primary?.severity || 'Not specified'}
-          </div>
-          {assessment.primary?.icd10?.code && (
-            <div className="inline-block px-4 py-2 rounded-full font-medium bg-purple-100 text-purple-800 border-purple-300">
-              ICD-10: {assessment.primary.icd10.code}
+      {/* Clinical Summary Card */}
+      <Card className="border-2 border-blue-200 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-white">
+          <CardTitle className="flex items-center gap-3 text-2xl text-blue-800">
+            <Stethoscope className="h-8 w-8 text-blue-600" />
+            Clinical Assessment Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-semibold text-gray-700">Overall Severity:</span>
+              <span className={`px-4 py-2 rounded-full text-lg font-bold border ${getSeverityColor(clinicalSummary.severity)}`}>
+                {(clinicalSummary.severity || 'Moderate').toUpperCase()}
+              </span>
             </div>
-          )}
-        </div>
 
-        {/* ICD-10 Details */}
-        {assessment.primary?.icd10 && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-purple-500" />
-              ICD-10 Classification
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Category</p>
-                <p className="text-gray-900">{assessment.primary.icd10.category || 'Not specified'}</p>
+            {/* ICD Codes */}
+            {clinicalSummary.icdCodes && clinicalSummary.icdCodes.length > 0 && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-800 mb-3">Clinical Classifications</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {clinicalSummary.icdCodes.map((code: any, index: number) => (
+                    <div key={index} className="bg-white p-3 rounded border">
+                      <p className="font-medium text-gray-700">{code.condition?.toUpperCase()}</p>
+                      <div className="flex gap-4 mt-1 text-sm">
+                        <span className="text-blue-600">ICD-10: {code.icd10}</span>
+                        <span className="text-blue-600">ICD-11: {code.icd11}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-600">Sub-category</p>
-                <p className="text-gray-900">{assessment.primary.icd10.subCategory || 'Not specified'}</p>
+            )}
+
+            {/* NIMHANS Scales */}
+            {clinicalSummary.nimhansScales && clinicalSummary.nimhansScales.length > 0 && (
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-800 mb-3">Recommended NIMHANS Assessments</h4>
+                <ul className="space-y-2">
+                  {clinicalSummary.nimhansScales.map((scale: string, index: number) => (
+                    <li key={index} className="flex items-start gap-2 text-gray-700">
+                      <ListChecks className="h-5 w-5 text-blue-500 mt-0.5" />
+                      <span>{scale}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="col-span-2">
-                <p className="text-sm text-gray-600">Description</p>
-                <p className="text-gray-900">{assessment.primary.icd10.description || 'Not specified'}</p>
-              </div>
-            </div>
+            )}
           </div>
-        )}
+        </CardContent>
+      </Card>
 
-        <div className="text-gray-700">Category: {assessment.primary?.category || 'Not specified'}</div>
-        <div className="mt-2 text-gray-700">
-          NIMHANS Classification: {assessment.primary?.nimhansClassification || 'Not specified'}
-        </div>
-        
-        <div className="mt-4">
-          <h4 className="font-medium text-gray-900 mb-2">Primary Symptoms:</h4>
-          <ul className="list-disc pl-5 space-y-2">
-            {safeMap(assessment.primary?.symptoms, (symptom: string, index: number) => (
-              <li key={index} className="text-gray-800">{symptom}</li>
+      {/* Scores and Analysis Card */}
+      <Card className="border-2 border-gray-200 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-white">
+          <CardTitle className="flex items-center gap-3 text-xl text-gray-800">
+            <Activity className="h-6 w-6 text-blue-500" />
+            Detailed Assessment Scores
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-6">
+            {Object.entries(scores).map(([domain, score]) => (
+              <div key={domain} className="bg-white p-4 rounded-lg border shadow-sm">
+                <div className="flex justify-between items-center mb-2">
+                  <p className="font-semibold text-gray-700 capitalize">{domain} Health</p>
+                  <span className={`text-lg font-bold ${Number(score) >= 7 ? 'text-green-600' : Number(score) >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {typeof score === 'number' ? score.toFixed(1) : '0'}/10
+                  </span>
+                </div>
+                <div className="h-2.5 w-full bg-gray-200 rounded-full">
+                  <div 
+                    className={`h-2.5 rounded-full ${getProgressColor(Number(score))} transition-all duration-500`}
+                    style={{ width: `${Number(score) * 10}%` }}
+                  />
+                </div>
+              </div>
             ))}
-          </ul>
-        </div>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Psychometric Scores */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-4 border-2 border-purple-200">
-          <h4 className="font-medium text-gray-900 mb-2">PHQ-9 Score</h4>
-          <div className={`text-2xl font-bold ${getScoreColor('phq9', assessment.psychometricScores?.phq9)}`}>
-            {assessment.psychometricScores?.phq9 ?? 'N/A'}/27
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 border-2 border-blue-200">
-          <h4 className="font-medium text-gray-900 mb-2">GAD-7 Score</h4>
-          <div className={`text-2xl font-bold ${getScoreColor('gad7', assessment.psychometricScores?.gad7)}`}>
-            {assessment.psychometricScores?.gad7 ?? 'N/A'}/21
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 border-2 border-green-200">
-          <h4 className="font-medium text-gray-900 mb-2">EQ Score</h4>
-          <div className={`text-2xl font-bold ${getScoreColor('eq', assessment.psychometricScores?.eqScore)}`}>
-            {assessment.psychometricScores?.eqScore ?? 'N/A'}/100
-          </div>
-        </div>
-      </div>
-
-      {/* Treatment Recommendations */}
-      {assessment.treatmentPlan && (
-        <div className="bg-white rounded-lg shadow-lg border-2 border-green-200 p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">NIMHANS Treatment Plan</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">Immediate Actions:</h4>
-              <ul className="list-disc pl-5 space-y-2">
-                {safeMap(assessment.treatmentPlan.immediate, (action, index) => (
-                  <li key={index} className="text-gray-800">{action}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">Long-term Strategies:</h4>
-              <ul className="list-disc pl-5 space-y-2">
-                {safeMap(assessment.treatmentPlan.longTerm, (strategy, index) => (
-                  <li key={index} className="text-gray-800">{strategy}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          
-          <div className="mt-4">
-            <h4 className="font-medium text-gray-900 mb-2">Recommended Therapeutic Approaches:</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {safeMap(assessment.treatmentPlan.therapeuticApproaches, (approach, index) => (
-                <div key={index} className="text-gray-800">
-                  <p className="text-blue-900 font-medium">{approach}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Professional Care Recommendations */}
-      {assessment.professionalCare?.recommended && (
-        <div className="bg-red-50 rounded-lg shadow-lg border-l-4 border-red-500 p-6">
-          <div className="flex items-start gap-4">
-            <AlertCircle className="h-6 w-6 text-red-500 mt-1" />
-            <div>
-              <h3 className="text-lg font-semibold text-red-800">Professional Care Recommended</h3>
-              <div className="mt-2 space-y-3">
-                <p className="text-red-700">
-                  {assessment.professionalCare.recommendationType} Treatment Recommended
-                </p>
-                <p className="font-medium text-red-800">
-                  Urgency Level: {assessment.professionalCare.urgencyLevel}
-                </p>
-                <div className="mt-3">
-                  <h4 className="font-medium text-red-800 mb-2">Specialist Referrals:</h4>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {safeMap(assessment.professionalCare.specialistReferral, (specialist, index) => (
-                      <li key={index} className="text-red-700">{specialist}</li>
-                    ))}
-                  </ul>
-                </div>
+      {/* Recommendations Card */}
+      <Card className="border-2 border-green-200 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-green-50 to-white">
+          <CardTitle className="flex items-center gap-3 text-xl text-gray-800">
+            <FileText className="h-6 w-6 text-green-500" />
+            Treatment Recommendations
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-6">
+            {recommendations.immediate?.length > 0 && (
+              <div className="bg-red-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-red-800 mb-3">Immediate Actions</h4>
+                <ul className="space-y-2">
+                  {recommendations.immediate.map((rec: string, index: number) => (
+                    <li key={index} className="flex items-start gap-2 text-red-700">
+                      <span className="text-red-500 mt-1">•</span>
+                      <span>{rec}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
+            )}
+
+            {recommendations.shortTerm?.length > 0 && (
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-blue-800 mb-3">Short-Term Goals</h4>
+                <ul className="space-y-2">
+                  {recommendations.shortTerm.map((rec: string, index: number) => (
+                    <li key={index} className="flex items-start gap-2 text-blue-700">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>{rec}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {recommendations.longTerm?.length > 0 && (
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-green-800 mb-3">Long-Term Strategy</h4>
+                <ul className="space-y-2">
+                  {recommendations.longTerm.map((rec: string, index: number) => (
+                    <li key={index} className="flex items-start gap-2 text-green-700">
+                      <span className="text-green-500 mt-1">•</span>
+                      <span>{rec}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
