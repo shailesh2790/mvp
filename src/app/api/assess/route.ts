@@ -30,272 +30,206 @@ interface AssessmentData {
   };
 }
 
-function calculateClinicalScores(responses: any[]) {
+function calculateScores(responses: any[]) {
   const scores = {
     depression: 0,
     anxiety: 0,
+    bipolar: 0,
     stress: 0,
-    adjustment: 0
+    overall: 0
   };
+
+  let totalQuestions = 0;
 
   responses.forEach(response => {
     const question = response.question;
     if (question.clinicalRelevance) {
       question.clinicalRelevance.forEach((condition: string) => {
-        if (question.type === 'scale') {
-          scores[condition] += 11 - response.response; // Invert scale for severity
-        } else if (question.type === 'yesNo' && response.response) {
-          scores[condition] += 5;
-        } else if (question.type === 'multiSelect') {
-          scores[condition] += response.response.length * 2;
+        totalQuestions++;
+        switch (question.type) {
+          case 'scale':
+            scores[condition] += 10 - response.response; // Invert for severity
+            break;
+          case 'yesNo':
+            scores[condition] += response.response ? 10 : 0;
+            break;
+          case 'multiSelect':
+            if (Array.isArray(response.response)) {
+              scores[condition] += (response.response.length / question.options.length) * 10;
+            }
+            break;
+          case 'singleSelect':
+            const negativeOptions = ['Very poor', 'Poor', 'Severe'];
+            if (negativeOptions.includes(response.response)) {
+              scores[condition] += 10;
+            }
+            break;
         }
       });
     }
   });
 
-  // Normalize scores to 0-10 range
+  // Normalize scores
   Object.keys(scores).forEach(key => {
-    scores[key] = Math.min(Math.round((scores[key] / 50) * 10), 10);
+    if (key !== 'overall') {
+      scores[key] = Math.round((scores[key] / totalQuestions) * 10);
+    }
   });
+
+  // Calculate overall score
+  scores.overall = Math.round(
+    (scores.depression + scores.anxiety + scores.bipolar + scores.stress) / 4
+  );
 
   return scores;
 }
 
-function generateClinicalSummary(responses: any[], scores: any) {
-  const clinicalScores = calculateClinicalScores(responses);
-  
-  const findings = {
-    primaryConcerns: [] as string[],
-    clinicalImpressions: [] as string[],
-    icdCodes: [] as any[],
-    nimhansScales: [] as string[],
-    severity: '',
-    riskLevel: 'low',
-    recommendations: [] as string[]
+function generateClinicalSummary(scores: any, responses: any[]) {
+  const summary = {
+    severity: scores.overall >= 7 ? 'severe' : scores.overall >= 5 ? 'moderate' : 'mild',
+    primaryConcerns: [],
+    clinicalImpressions: [],
+    icdCodes: [],
+    nimhansScales: [],
+    recommendations: []
   };
 
-  // Determine primary concerns and clinical impressions
-  Object.entries(clinicalScores).forEach(([condition, score]) => {
-    if (score >= 7) {
-      findings.primaryConcerns.push(condition);
-      findings.icdCodes.push({
-        condition,
-        icd10: condition === 'depression' ? 'F32' : condition === 'anxiety' ? 'F41' : 'F43',
-        icd11: condition === 'depression' ? '6A70' : condition === 'anxiety' ? '6B00' : '6B40'
-      });
+  // Map conditions to ICD codes
+  const conditionMappings = {
+    depression: { icd10: 'F32', icd11: '6A70', scale: 'PHQ-9' },
+    anxiety: { icd10: 'F41', icd11: '6B00', scale: 'GAD-7' },
+    bipolar: { icd10: 'F31', icd11: '6A60', scale: 'YMRS' },
+    stress: { icd10: 'F43', icd11: '6B40', scale: 'PSS' }
+  };
+
+  // Identify primary concerns (scores >= 6)
+  Object.entries(scores).forEach(([condition, score]) => {
+    if (condition !== 'overall' && score >= 6) {
+      summary.primaryConcerns.push(condition);
+      if (conditionMappings[condition]) {
+        summary.icdCodes.push({
+          condition,
+          icd10: conditionMappings[condition].icd10,
+          icd11: conditionMappings[condition].icd11
+        });
+        summary.nimhansScales.push(conditionMappings[condition].scale);
+      }
     }
   });
-
-  // Set severity based on highest score
-  const maxScore = Math.max(...Object.values(clinicalScores));
-  findings.severity = maxScore >= 8 ? 'severe' : maxScore >= 6 ? 'moderate' : 'mild';
-  
-  // Determine risk level
-  findings.riskLevel = maxScore >= 8 ? 'high' : maxScore >= 6 ? 'moderate' : 'low';
-
-  // Generate NIMHANS scale recommendations
-  findings.nimhansScales = findings.primaryConcerns.map(concern => {
-    switch(concern) {
-      case 'depression': return 'Hamilton Depression Rating Scale (HAM-D)';
-      case 'anxiety': return 'Hamilton Anxiety Rating Scale (HAM-A)';
-      case 'stress': return 'Perceived Stress Scale (PSS)';
-      default: return '';
-    }
-  }).filter(scale => scale !== '');
 
   // Generate clinical impressions
-  findings.clinicalImpressions = findings.primaryConcerns.map(concern => {
-    const score = clinicalScores[concern];
-    return `${concern.charAt(0).toUpperCase() + concern.slice(1)}: ${score}/10 - ${findings.severity} severity`;
+  responses.forEach(response => {
+    if (response.question.clinicalRelevance) {
+      const relevantSymptoms = response.question.clinicalRelevance
+        .filter(condition => summary.primaryConcerns.includes(condition));
+      
+      if (relevantSymptoms.length > 0) {
+        summary.clinicalImpressions.push({
+          symptom: response.question.text,
+          severity: response.response,
+          conditions: relevantSymptoms
+        });
+      }
+    }
   });
 
-  // Generate recommendations
-  if (findings.severity === 'severe') {
-    findings.recommendations.push('Immediate professional mental health consultation recommended');
-    findings.recommendations.push('Consider comprehensive psychiatric evaluation');
-  } else if (findings.severity === 'moderate') {
-    findings.recommendations.push('Professional mental health consultation recommended');
-    findings.recommendations.push('Regular monitoring of symptoms advised');
+  // Generate recommendations based on severity
+  if (summary.severity === 'severe') {
+    summary.recommendations.push(
+      'Immediate professional mental health consultation recommended',
+      'Consider comprehensive psychiatric evaluation',
+      'Develop crisis management plan'
+    );
+  } else if (summary.severity === 'moderate') {
+    summary.recommendations.push(
+      'Schedule consultation with mental health professional',
+      'Regular monitoring of symptoms',
+      'Implement stress management strategies'
+    );
+  } else {
+    summary.recommendations.push(
+      'Continue self-monitoring',
+      'Practice preventive mental health strategies',
+      'Consider routine check-ups'
+    );
   }
 
-  findings.recommendations.push(...findings.nimhansScales.map(scale => 
-    `Complete ${scale} for detailed assessment`
-  ));
-
-  return findings;
+  return summary;
 }
 
-function calculateScores(assessment: AssessmentData, responses: any[]) {
-  const scores = {
-    emotional: 0,
-    cognitive: 0,
-    behavioral: 0,
-    overall: 0
-  };
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { currentAssessment, responses, history } = body;
 
-  // Calculate scores from assessment data
-  scores.emotional = (
-    assessment.emotional.intensity +
-    (!assessment.emotional.anxiety ? 10 : 5) +
-    (!assessment.emotional.moodSwings ? 10 : 5) +
-    assessment.emotional.energy
-  ) / 4;
+    if (!responses || !Array.isArray(responses)) {
+      return NextResponse.json(
+        { error: 'Valid responses are required' },
+        { status: 400 }
+      );
+    }
 
-  scores.cognitive = (
-    assessment.cognitive.concentration +
-    (!assessment.cognitive.focusIssues ? 10 : 5) +
-    (!assessment.cognitive.memoryIssues ? 10 : 5) +
-    assessment.cognitive.decisionMaking +
-    assessment.cognitive.clarity
-  ) / 5;
+    // Calculate clinical scores
+    const scores = calculateScores(responses);
 
-  scores.behavioral = (
-    (assessment.behavioral.sleep === 'good' ? 10 : assessment.behavioral.sleep === 'fair' ? 7 : 4) +
-    (assessment.behavioral.sleepHours >= 7 ? 10 : assessment.behavioral.sleepHours >= 6 ? 7 : 4) +
-    (assessment.behavioral.socialActivity === 'normal' ? 10 : 
-      assessment.behavioral.socialActivity === 'reduced' ? 7 : 
-      assessment.behavioral.socialActivity === 'withdrawn' ? 4 : 6) +
-     (!assessment.behavioral.avoidance ? 10 : 5) +
-     (!assessment.behavioral.routineChanges ? 10 : 5)
-   ) / 5;
- 
-   scores.overall = (scores.emotional + scores.cognitive + scores.behavioral) / 3;
- 
-   return scores;
- }
- 
- function generateDetailedAnalysis(assessment: AssessmentData, scores: any, clinicalSummary: any) {
-   return {
-     emotional: {
-       summary: `Your emotional well-being score is ${scores.emotional.toFixed(1)}/10. ${
-         scores.emotional < 5 ? 
-           "You appear to be experiencing significant emotional challenges." :
-         scores.emotional < 7 ?
-           "You're showing moderate emotional stability with some areas for improvement." :
-           "You're displaying good emotional stability overall."
-       }`,
-       details: [
-         `Mood and energy levels: ${assessment.emotional.intensity}/10`,
-         assessment.emotional.anxiety ? "Presence of anxiety symptoms noted" : "",
-         assessment.emotional.moodSwings ? "Mood fluctuations reported" : "",
-         `Energy level reported at ${assessment.emotional.energy}/10`
-       ].filter(Boolean),
-       recommendations: [
-         "Practice daily mindfulness meditation",
-         "Maintain a mood journal",
-         assessment.emotional.anxiety ? "Consider anxiety-reduction techniques" : "",
-         assessment.emotional.moodSwings ? "Establish consistent daily routines" : "",
-         "Engage in regular physical activity",
-         scores.emotional < 6 ? "Consider professional mental health support" : ""
-       ].filter(Boolean)
-     },
-     cognitive: {
-       summary: `Your cognitive functioning score is ${scores.cognitive.toFixed(1)}/10. ${
-         scores.cognitive < 5 ?
-           "You're experiencing significant cognitive challenges." :
-         scores.cognitive < 7 ?
-           "Your cognitive function shows moderate efficiency with some areas for improvement." :
-           "You're demonstrating good cognitive function overall."
-       }`,
-       details: [
-         `Concentration level: ${assessment.cognitive.concentration}/10`,
-         assessment.cognitive.focusIssues ? "Difficulties with focus and attention noted" : "",
-         assessment.cognitive.memoryIssues ? "Memory challenges reported" : "",
-         `Decision-making capacity: ${assessment.cognitive.decisionMaking}/10`
-       ].filter(Boolean),
-       recommendations: [
-         "Practice cognitive exercises regularly",
-         assessment.cognitive.focusIssues ? "Break tasks into smaller chunks" : "",
-         assessment.cognitive.memoryIssues ? "Use memory aids and organization tools" : "",
-         "Ensure adequate sleep",
-         "Consider mindfulness practices",
-         scores.cognitive < 6 ? "Consult with a healthcare provider" : ""
-       ].filter(Boolean)
-     },
-     behavioral: {
-       summary: `Your behavioral health score is ${scores.behavioral.toFixed(1)}/10. ${
-         scores.behavioral < 5 ?
-           "Several behavioral patterns may be impacting your well-being." :
-         scores.behavioral < 7 ?
-           "Your behavioral patterns show moderate health with some areas for improvement." :
-           "You're maintaining generally healthy behavioral patterns."
-       }`,
-       details: [
-         `Sleep Quality: ${assessment.behavioral.sleep} (${assessment.behavioral.sleepHours} hours)`,
-         `Social Activity Level: ${assessment.behavioral.socialActivity}`,
-         assessment.behavioral.avoidance ? "Avoidance behaviors noted" : "",
-         assessment.behavioral.routineChanges ? "Changes in daily routines reported" : ""
-       ].filter(Boolean),
-       recommendations: [
-         assessment.behavioral.sleepHours < 7 ? "Work on improving sleep duration and quality" : "",
-         assessment.behavioral.socialActivity === 'reduced' || assessment.behavioral.socialActivity === 'withdrawn' ?
-           "Gradually increase social interactions" : "",
-         assessment.behavioral.avoidance ? "Practice gradual exposure to avoided situations" : "",
-         assessment.behavioral.routineChanges ? "Establish consistent daily routines" : "",
-         "Maintain regular exercise",
-         "Practice good sleep hygiene"
-       ].filter(Boolean)
-     }
-   };
- }
- 
- export async function POST(request: Request) {
-   try {
-     const body = await request.json();
-     const { currentAssessment, responses, history } = body;
- 
-     if (!currentAssessment) {
-       return NextResponse.json(
-         { error: 'Assessment data is required' },
-         { status: 400 }
-       );
-     }
- 
-     // Calculate basic scores
-     const scores = calculateScores(currentAssessment, responses);
- 
-     // Generate clinical summary
-     const clinicalSummary = generateClinicalSummary(responses, scores);
- 
-     // Generate detailed analysis
-     const detailedAnalysis = generateDetailedAnalysis(currentAssessment, scores, clinicalSummary);
- 
-     // Prepare final assessment
-     const assessment = {
-       timestamp: new Date().toISOString(),
-       scores,
-       summary: `Overall Assessment Score: ${scores.overall.toFixed(1)}/10`,
-       clinicalSummary,
-       detailedAnalysis,
-       recommendations: {
-         immediate: clinicalSummary.severity === 'severe' ? [
-           "Seek immediate professional mental health support",
-           "Consider comprehensive psychiatric evaluation",
-           "Establish a safety plan with support network"
-         ] : [],
-         shortTerm: [
-           ...clinicalSummary.recommendations,
-           "Regular monitoring of symptoms",
-           "Implement suggested coping strategies"
-         ],
-         longTerm: [
-           "Develop sustainable self-care routines",
-           "Build strong support networks",
-           "Regular mental health check-ins"
-         ]
-       }
-     };
- 
-     return NextResponse.json({
-       success: true,
-       assessment
-     });
- 
-   } catch (error) {
-     console.error('Assessment error:', error);
-     return NextResponse.json(
-       { error: 'Assessment failed', details: error instanceof Error ? error.message : 'Unknown error' },
-       { status: 500 }
-     );
-   }
- }
+    // Generate clinical summary
+    const clinicalSummary = generateClinicalSummary(scores, responses);
+
+    // Generate analysis and recommendations
+    const assessment = {
+      timestamp: new Date().toISOString(),
+      scores,
+      clinicalSummary,
+      summary: `Overall Assessment Score: ${scores.overall}/10 - ${clinicalSummary.severity.toUpperCase()} severity`,
+      recommendations: {
+        immediate: clinicalSummary.severity === 'severe' ? [
+          "Seek immediate professional mental health support",
+          "Consider comprehensive psychiatric evaluation",
+          "Establish a safety plan with support network"
+        ] : [],
+        shortTerm: [
+          ...clinicalSummary.recommendations,
+          "Regular monitoring of symptoms",
+          "Implement suggested coping strategies"
+        ],
+        longTerm: [
+          "Develop sustainable self-care routines",
+          "Build strong support networks",
+          "Regular mental health check-ins"
+        ]
+      },
+      detailedAnalysis: {
+        emotional: {
+          summary: `Emotional health score: ${scores.depression}/10`,
+          details: responses
+            .filter(r => r.question.category === 'emotional')
+            .map(r => `${r.question.text}: ${r.response}`)
+        },
+        cognitive: {
+          summary: `Cognitive function score: ${scores.overall}/10`,
+          details: responses
+            .filter(r => r.question.category === 'cognitive')
+            .map(r => `${r.question.text}: ${r.response}`)
+        },
+        behavioral: {
+          summary: `Behavioral health score: ${scores.overall}/10`,
+          details: responses
+            .filter(r => r.question.category === 'behavioral')
+            .map(r => `${r.question.text}: ${r.response}`)
+        }
+      }
+    };
+
+    return NextResponse.json({
+      success: true,
+      assessment
+    });
+
+  } catch (error) {
+    console.error('Assessment error:', error);
+    return NextResponse.json(
+      { error: 'Assessment failed', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
