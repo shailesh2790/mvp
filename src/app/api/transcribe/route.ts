@@ -1,50 +1,46 @@
+// app/api/transcribe/route.ts
+
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const audioFile = formData.get('audio') as File;
+    const audioBlob = formData.get('audio') as Blob;
 
-    if (!audioFile) {
+    if (!audioBlob) {
       return NextResponse.json(
         { error: 'No audio file provided' },
         { status: 400 }
       );
     }
 
-    // Convert audio file to text using Mistral
-    const prompt = `Transcribe this audio file accurately. Return only the transcribed text.`;
+    // Convert blob to base64
+    const buffer = await audioBlob.arrayBuffer();
+    const base64Audio = Buffer.from(buffer).toString('base64');
 
+    // Use Mistral to transcribe (since OpenAI Whisper might not be available)
     const response = await fetch('http://localhost:11435/api/generate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: "mistral",
-        prompt: prompt,
-        stream: false,
-        format: "text",
-        options: {
-          temperature: 0.2,
-        }
-      }),
+        model: 'mistral',
+        prompt: `Transcribe the following audio content into text. Consider emotional context and mental health aspects in the transcription: ${base64Audio}`,
+        format: 'text'
+      })
     });
 
     if (!response.ok) {
-      throw new Error('Transcription service failed');
+      throw new Error('Transcription failed');
     }
 
-    const data = await response.json();
-    return NextResponse.json({ text: data.response });
+    const result = await response.json();
+
+    return NextResponse.json({ text: result.response });
 
   } catch (error) {
     console.error('Transcription error:', error);
     return NextResponse.json(
-      { 
-        error: 'Transcription failed', 
-        details: error instanceof Error ? error.message : 'Unknown error' 
-      },
+      { error: 'Transcription failed', details: error.message },
       { status: 500 }
     );
   }

@@ -192,89 +192,7 @@ const questions = [
 ];
 
 
-
-async function generateDynamicQuestion(previousResponses: any[]) {
-  try {
-    const lastResponse = previousResponses[previousResponses.length - 1];
-    
-    // Create context based on NIMHANS diagnostic tree
-    const context = `
-    Based on NIMHANS diagnostic principles and the following patient response:
-    Question: "${lastResponse.question.text}"
-    Response: "${lastResponse.response}"
-    Category: ${lastResponse.question.category}
-
-    Consider the diagnostic tree:
-    Level 1: Categorize symptoms (Mood, Anxiety, Behavioral, Trauma, Psychosis)
-    Level 2: Refine categories based on specific symptoms
-    Level 3: Identify comorbidities
-    Level 4: Rule out organic causes
-    Level 5: Cross-verify with psychometric tools
-
-    Generate a follow-up question that:
-    1. Aligns with NIMHANS diagnostic principles
-    2. Helps identify potential comorbidities
-    3. Follows standardized assessment scales (PHQ-9, GAD-7, YMRS)
-    4. Uses culturally sensitive language
-    
-    Return the question in JSON format with:
-    {
-      "text": "question text",
-      "type": "scale/yesNo/multiSelect/singleSelect",
-      "category": "category",
-      "options": ["option1", "option2"],
-      "clinicalRelevance": ["condition1", "condition2"],
-      "nimhansRef": "reference to NIMHANS scale"
-    }`;
-
-    try {
-      // Call Mistral via Ollama
-      const response = await fetch('http://localhost:11435/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'mistral',
-          prompt: context,
-          format: 'json'
-        })
-      });
-
-      if (!response.ok) {
-        console.error('Mistral API error:', response.statusText);
-        return null;
-      }
-
-      const data = await response.json();
-      let generatedQuestion;
-      
-      try {
-        generatedQuestion = JSON.parse(data.response);
-      } catch (parseError) {
-        console.error('Failed to parse Mistral response:', parseError);
-        return null;
-      }
-
-      // Validate the generated question has required fields
-      if (!generatedQuestion.text || !generatedQuestion.type || !generatedQuestion.category) {
-        console.error('Invalid question format from Mistral');
-        return null;
-      }
-
-      return {
-        id: `dynamic-${Date.now()}`,
-        ...generatedQuestion,
-        followUp: true
-      };
-    } catch (mistralError) {
-      console.error('Mistral API call failed:', mistralError);
-      return null;
-    }
-  } catch (error) {
-    console.error('Question generation failed:', error);
-    return null;
-  }
-}
-
+// Add the shouldGenerateDynamicQuestion function
 function shouldGenerateDynamicQuestion(previousResponses: any[]) {
   if (previousResponses.length === 0) return false;
   
@@ -335,26 +253,146 @@ function shouldGenerateDynamicQuestion(previousResponses: any[]) {
   return false;
 }
 
+async function generateDynamicQuestion(previousResponses: any[]) {
+  try {
+    const lastResponse = previousResponses[previousResponses.length - 1];
+    
+    // Create a more specific prompt for Mistral
+    const prompt = `You are a mental health assessment expert. Based on the patient's previous response, generate a relevant follow-up question.
+
+Previous Question: "${lastResponse.question.text}"
+Patient Response: "${lastResponse.response}"
+Category: ${lastResponse.question.category}
+
+Return a single JSON object in this exact format:
+{
+  "text": "[Your follow-up question here]",
+  "type": "scale",
+  "category": "${lastResponse.question.category}",
+  "clinicalRelevance": ["depression", "anxiety"],
+  "nimhansRef": "PHQ-9"
+}
+
+Rules:
+1. type must be one of: scale, yesNo, multiSelect, singleSelect
+2. category must be one of: emotional, cognitive, behavioral
+3. Return ONLY the JSON object, no other text or explanation
+4. Must be valid JSON format
+5. For multiSelect/singleSelect, include options array`;
+
+    // Call Mistral
+    const response = await fetch('http://localhost:11435/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'mistral',
+        prompt: prompt,
+        temperature: 0.7,
+        top_p: 0.95,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Mistral API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Clean up the response
+    let jsonString = data.response.trim();
+    
+    // Remove markdown code blocks if present
+    jsonString = jsonString.replace(/```json\s*|\s*```/g, '');
+    
+    // Remove any leading/trailing brackets if they exist outside the main object
+    jsonString = jsonString.replace(/^\s*\{\s*|\s*\}\s*$/g, m => m.trim());
+    
+    // Ensure the string is properly wrapped in brackets
+    if (!jsonString.startsWith('{')) jsonString = '{' + jsonString;
+    if (!jsonString.endsWith('}')) jsonString = jsonString + '}';
+
+    // Parse the cleaned JSON
+    let generatedQuestion;
+    try {
+      generatedQuestion = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Attempted to parse:', jsonString);
+      
+      // Return a fallback question based on the previous response
+      return {
+        id: `dynamic-${Date.now()}`,
+        text: `Could you elaborate more on how these ${lastResponse.question.category} symptoms affect your daily life?`,
+        type: 'scale',
+        category: lastResponse.question.category,
+        clinicalRelevance: lastResponse.question.clinicalRelevance || ['general'],
+        nimhansRef: 'GAF-Scale',
+        followUp: true
+      };
+    }
+
+    // Validate and sanitize the generated question
+    const validTypes = ['scale', 'yesNo', 'multiSelect', 'singleSelect'];
+    const validCategories = ['emotional', 'cognitive', 'behavioral'];
+
+    if (!validTypes.includes(generatedQuestion.type)) {
+      generatedQuestion.type = 'scale';
+    }
+
+    if (!validCategories.includes(generatedQuestion.category)) {
+      generatedQuestion.category = lastResponse.question.category;
+    }
+
+    // Add options if needed for multiSelect/singleSelect
+    if ((generatedQuestion.type === 'multiSelect' || generatedQuestion.type === 'singleSelect') && 
+        (!generatedQuestion.options || !Array.isArray(generatedQuestion.options))) {
+      generatedQuestion.options = [
+        'Significantly',
+        'Moderately',
+        'Minimally',
+        'Not at all'
+      ];
+    }
+
+    return {
+      id: `dynamic-${Date.now()}`,
+      ...generatedQuestion,
+      followUp: true
+    };
+
+  } catch (error) {
+    console.error('Dynamic question generation failed:', error);
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { currentQuestion, previousResponses = [] } = body;
 
+    // Log request details
     console.log('Processing request:', {
       currentQuestion: currentQuestion?.id,
-      responsesCount: previousResponses.length
+      responseCount: previousResponses.length
     });
 
-    // Attempt dynamic question generation
+    // Check if we should generate a dynamic question
     if (previousResponses.length > 0 && shouldGenerateDynamicQuestion(previousResponses)) {
-      console.log('Attempting dynamic question generation...');
-      const dynamicQuestion = await generateDynamicQuestion(previousResponses);
-      if (dynamicQuestion) {
-        console.log('Dynamic question generated:', dynamicQuestion.id);
-        return NextResponse.json({
-          complete: false,
-          question: dynamicQuestion
-        });
+      try {
+        console.log('Attempting dynamic question generation...');
+        const dynamicQuestion = await generateDynamicQuestion(previousResponses);
+        if (dynamicQuestion) {
+          console.log('Successfully generated dynamic question');
+          return NextResponse.json({
+            complete: false,
+            question: dynamicQuestion
+          });
+        }
+      } catch (error) {
+        console.error('Dynamic question generation failed:', error);
+        // Continue to structured questions on failure
       }
     }
 
@@ -366,6 +404,7 @@ export async function POST(request: Request) {
 
     const nextQuestion = questions[previousResponses.length];
     console.log('Serving structured question:', nextQuestion.id);
+    
     return NextResponse.json({
       complete: false,
       question: nextQuestion
@@ -374,7 +413,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Request processing error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate next question', details: error.message },
+      { 
+        error: 'Failed to process request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

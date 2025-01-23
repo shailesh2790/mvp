@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { Stethoscope, FileText, ListChecks } from 'lucide-react';
 import { Brain, Activity, Heart, Mic, AlertTriangle, TrendingUp, History, LogOut } from 'lucide-react';
 import ResultsSection from './components/ResultsSection';
 
@@ -74,7 +75,8 @@ export default function Home() {
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   // Main Assessment Data
   const [data, setData] = useState<AssessmentData>({
@@ -276,50 +278,59 @@ export default function Home() {
     }
   };
 
-  // Voice recording functions
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder.current = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
       
-      mediaRecorder.current.ondataavailable = async (event) => {
-        if (event.data.size > 0) {
-          await handleAudioData(event.data);
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
         }
       };
-
-      mediaRecorder.current.start();
+  
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/wav' });
+        await handleAudioData(audioBlob);
+        setAudioChunks([]);
+      };
+  
+      mediaRecorder.start();
       setIsRecording(true);
+      setTranscript(''); // Clear previous transcript
     } catch (error) {
-      console.error('Recording error:', error);
-      alert('Could not access microphone');
+      console.error('Failed to start recording:', error);
+      alert('Could not access microphone. Please check permissions.');
     }
   };
-
+  
   const stopRecording = () => {
-    if (mediaRecorder.current && isRecording) {
-      mediaRecorder.current.stop();
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
     }
   };
-
+  
   const handleAudioData = async (blob: Blob) => {
     try {
       const formData = new FormData();
       formData.append('audio', blob);
-
+  
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData
       });
-
+  
       if (!response.ok) {
         throw new Error('Transcription failed');
       }
-
+  
       const { text } = await response.json();
       setTranscript(text);
-      
+
       setData(prev => ({
         ...prev,
         emotional: {
@@ -329,9 +340,12 @@ export default function Home() {
       }));
     } catch (error) {
       console.error('Audio processing error:', error);
-      alert('Failed to process audio recording');
+      alert('Failed to process audio recording. Please try again.');
     }
   };
+
+  // Voice recording functions
+  
 
   // Render functions
   const renderInitialForm = () => (
