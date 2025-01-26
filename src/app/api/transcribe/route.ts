@@ -1,6 +1,14 @@
-// app/api/transcribe/route.ts
-
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.ASSEMBLY_AI_KEY) {
+  throw new Error('Missing environment variables');
+}
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export async function POST(request: Request) {
   try {
@@ -8,39 +16,59 @@ export async function POST(request: Request) {
     const audioBlob = formData.get('audio') as Blob;
 
     if (!audioBlob) {
-      return NextResponse.json(
-        { error: 'No audio file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
 
-    // Convert blob to base64
+    // Upload to Supabase
     const buffer = await audioBlob.arrayBuffer();
-    const base64Audio = Buffer.from(buffer).toString('base64');
+    const fileName = `voice-journal-${Date.now()}.webm`;
+    
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('voice-journals')
+      .upload(fileName, buffer);
 
-    // Use Mistral to transcribe (since OpenAI Whisper might not be available)
-    const response = await fetch('http://localhost:11435/api/generate', {
+    if (uploadError) {
+      throw new Error(`Upload failed: ${uploadError.message}`);
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('voice-journals')
+      .getPublicUrl(fileName);
+
+    // AssemblyAI transcription
+    const response = await fetch('https://api.assemblyai.com/v2/transcript', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': process.env.ASSEMBLY_AI_KEY,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        model: 'mistral',
-        prompt: `Transcribe the following audio content into text. Consider emotional context and mental health aspects in the transcription: ${base64Audio}`,
-        format: 'text'
+        audio_url: publicUrl,
+        language_code: 'en',
+        sentiment_analysis: true
       })
     });
 
     if (!response.ok) {
-      throw new Error('Transcription failed');
+      const errorText = await response.text();
+      throw new Error(`Transcription failed: ${errorText}`);
     }
 
     const result = await response.json();
 
-    return NextResponse.json({ text: result.response });
+    return NextResponse.json({
+      id: result.id,
+      text: result.text,
+      sentiment: result.sentiment_analysis_results
+    });
 
-  } catch (error) {
-    console.error('Transcription error:', error);
+  } catch (error: any) {
+    console.error('Error:', error);
     return NextResponse.json(
-      { error: 'Transcription failed', details: error.message },
+      { error: error.message },
       { status: 500 }
     );
   }
