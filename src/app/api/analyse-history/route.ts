@@ -1,162 +1,113 @@
 import { NextResponse } from 'next/server';
 
 interface AnalysisResponse {
-  patterns: string[];
-  progress: {
-    improvements: string[];
-    concerns: string[];
-  };
-  personalizedRecommendations: string[];
-  earlyWarningSignals: string[];
-  eqDevelopment: {
-    strengths: string[];
-    areasForImprovement: string[];
-    exercises: string[];
-  };
+ patterns: string[];
+ progress: {
+   improvements: string[];
+   concerns: string[];
+ };
+ personalizedRecommendations: string[];
+ earlyWarningSignals: string[];
+ eqDevelopment: {
+   strengths: string[];
+   areasForImprovement: string[];
+   exercises: string[];
+ };
 }
 
-async function queryMistral(prompt: string) {
-  const OLLAMA_PORT = process.env.OLLAMA_PORT || '11435';
-  
-  try {
-    const response = await fetch(`http://localhost:${OLLAMA_PORT}/api/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: "mistral",
-        prompt: prompt,
-        stream: false,
-        format: "json"
-      }),
-    });
+async function queryHF(prompt: string) {
+ try {
+   const response = await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-v0.1', {
+     headers: {
+       'Authorization': `Bearer ${process.env.HF_API_KEY}`,
+       'Content-Type': 'application/json'
+     },
+     method: 'POST',
+     body: JSON.stringify({
+       inputs: prompt,
+       parameters: {
+         temperature: 0.8,
+         top_p: 0.9,
+         max_new_tokens: 1000,
+         return_full_text: false
+       }
+     })
+   });
 
-    if (!response.ok) {
-      throw new Error(`Mistral API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.response;
-  } catch (error) {
-    console.error('Mistral API error:', error);
-    throw error;
-  }
+   if (!response.ok) throw new Error('HF API error');
+   const data = await response.json();
+   return data[0].generated_text;
+ } catch (error) {
+   console.error('HF API error:', error);
+   throw error;
+ }
 }
 
 export async function POST(request: Request) {
-  try {
-    const { currentAssessment, history } = await request.json();
+ try {
+   const { currentAssessment, history } = await request.json();
+   if (!currentAssessment) {
+     return NextResponse.json({ error: 'Assessment data required' }, { status: 400 });
+   }
 
-    if (!currentAssessment) {
-      return NextResponse.json(
-        { error: 'Current assessment data is required' },
-        { status: 400 }
-      );
-    }
+   const timestamp = new Date().toISOString();
+   const contextPrompt = `Analyze mental health assessment from ${timestamp}:
+     Current: ${JSON.stringify(currentAssessment)}
+     History: ${JSON.stringify(history || [])}
+     
+     Return JSON with exactly:
+     {
+       "patterns": ["5 behavioral patterns"],
+       "progress": {
+         "improvements": ["3-4 progress areas"],
+         "concerns": ["3-4 concern areas"]
+       },
+       "personalizedRecommendations": ["4-5 actions"],
+       "earlyWarningSignals": ["4-5 warning signs"],
+       "eqDevelopment": {
+         "strengths": ["3-4 strengths"],
+         "areasForImprovement": ["3-4 areas"],
+         "exercises": ["4-5 exercises"]
+       }
+     }`;
 
-    const prompt = `As a mental health professional, analyze this user's mental health history and provide detailed recommendations.
+   const result = await queryHF(contextPrompt);
+   let parsedResult;
+   try {
+     parsedResult = JSON.parse(result);
+   } catch (error) {
+     console.error('Failed to parse HF response:', result);
+     throw new Error('Invalid response format');
+   }
 
-Current Assessment Data:
-${JSON.stringify(currentAssessment, null, 2)}
+   // Validate and ensure all arrays exist
+   const validatedResponse: AnalysisResponse = {
+     patterns: Array.isArray(parsedResult?.patterns) ? parsedResult.patterns : [],
+     progress: {
+       improvements: Array.isArray(parsedResult?.progress?.improvements) ? parsedResult.progress.improvements : [],
+       concerns: Array.isArray(parsedResult?.progress?.concerns) ? parsedResult.progress.concerns : []
+     },
+     personalizedRecommendations: Array.isArray(parsedResult?.personalizedRecommendations) ? parsedResult.personalizedRecommendations : [],
+     earlyWarningSignals: Array.isArray(parsedResult?.earlyWarningSignals) ? parsedResult.earlyWarningSignals : [],
+     eqDevelopment: {
+       strengths: Array.isArray(parsedResult?.eqDevelopment?.strengths) ? parsedResult.eqDevelopment.strengths : [],
+       areasForImprovement: Array.isArray(parsedResult?.eqDevelopment?.areasForImprovement) ? parsedResult.eqDevelopment.areasForImprovement : [],
+       exercises: Array.isArray(parsedResult?.eqDevelopment?.exercises) ? parsedResult.eqDevelopment.exercises : []
+     }
+   };
 
-Historical Data:
-${JSON.stringify(history || [], null, 2)}
+   // Ensure minimum content
+   if (!validatedResponse.patterns.length || !validatedResponse.personalizedRecommendations.length) {
+     throw new Error('Insufficient analysis generated');
+   }
 
-Analyze the data and provide:
-1. Identify recurring patterns in the user's mental health
-2. Track progress over time
-3. Create personalized recommendations based on past responses
-4. List potential early warning signs
-5. Suggest emotional intelligence improvements
+   return NextResponse.json(validatedResponse);
 
-Return your analysis as a JSON object with EXACTLY this structure:
-{
-  "patterns": string[],
-  "progress": {
-    "improvements": string[],
-    "concerns": string[]
-  },
-  "personalizedRecommendations": string[],
-  "earlyWarningSignals": string[],
-  "eqDevelopment": {
-    "strengths": string[],
-    "areasForImprovement": string[],
-    "exercises": string[]
-  }
-}
-
-Ensure all arrays contain 3-5 detailed items. Be specific and professional while maintaining a supportive tone.`;
-
-    // Query Mistral model
-    const result = await queryMistral(prompt);
-    
-    // Parse and validate response
-    const parsedResult = JSON.parse(result);
-    
-    // Validate and format the response
-    const validatedResponse: AnalysisResponse = {
-      patterns: Array.isArray(parsedResult.patterns) ? parsedResult.patterns : [],
-      progress: {
-        improvements: Array.isArray(parsedResult.progress?.improvements) ? parsedResult.progress.improvements : [],
-        concerns: Array.isArray(parsedResult.progress?.concerns) ? parsedResult.progress.concerns : []
-      },
-      personalizedRecommendations: Array.isArray(parsedResult.personalizedRecommendations) ? parsedResult.personalizedRecommendations : [],
-      earlyWarningSignals: Array.isArray(parsedResult.earlyWarningSignals) ? parsedResult.earlyWarningSignals : [],
-      eqDevelopment: {
-        strengths: Array.isArray(parsedResult.eqDevelopment?.strengths) ? parsedResult.eqDevelopment.strengths : [],
-        areasForImprovement: Array.isArray(parsedResult.eqDevelopment?.areasForImprovement) ? parsedResult.eqDevelopment.areasForImprovement : [],
-        exercises: Array.isArray(parsedResult.eqDevelopment?.exercises) ? parsedResult.eqDevelopment.exercises : []
-      }
-    };
-
-    // Validate that we have content in our arrays
-    const hasContent = Object.values(validatedResponse).every(value => {
-      if (Array.isArray(value)) return value.length > 0;
-      if (typeof value === 'object') {
-        return Object.values(value).every(arr => 
-          Array.isArray(arr) && arr.length > 0
-        );
-      }
-      return true;
-    });
-
-    if (!hasContent) {
-      throw new Error('Invalid response structure: Empty arrays detected');
-    }
-
-    return NextResponse.json(validatedResponse);
-
-  } catch (error) {
-    console.error('History analysis error:', error);
-
-    if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid response format',
-          details: 'Failed to parse analysis results'
-        },
-        { status: 500 }
-      );
-    }
-
-    // Handle connection errors
-    if (error.message.includes('ECONNREFUSED')) {
-      return NextResponse.json(
-        { 
-          error: 'Service unavailable',
-          details: 'Unable to connect to the analysis service. Please ensure Ollama is running.'
-        },
-        { status: 503 }
-      );
-    }
-
-    return NextResponse.json(
-      { 
-        error: 'Analysis failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
+ } catch (error) {
+   console.error('Analysis error:', error);
+   return NextResponse.json(
+     { error: error instanceof Error ? error.message : 'Analysis failed' },
+     { status: 500 }
+   );
+ }
 }

@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Stethoscope, FileText, ListChecks } from 'lucide-react';
-import { Brain, Activity, Heart, Mic, AlertTriangle, TrendingUp, History, LogOut } from 'lucide-react';
+
+import { Brain, Activity, Heart, Mic, TrendingUp, LogOut } from 'lucide-react';
 import ResultsSection from './components/ResultsSection';
 
 interface DynamicQuestion {
@@ -281,31 +281,30 @@ export default function Home() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
       
       const chunks: Blob[] = [];
-      mediaRecorder.ondataavailable = (e) => {
+      recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunks.push(e.data);
         }
       };
   
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: 'audio/wav' });
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         await handleAudioData(audioBlob);
-        setAudioChunks([]);
       };
   
-      mediaRecorder.start();
+      recorder.start();
       setIsRecording(true);
-      setTranscript(''); // Clear previous transcript
+      setTranscript('');
     } catch (error) {
-      console.error('Failed to start recording:', error);
-      alert('Could not access microphone. Please check permissions.');
+      console.error('Recording error:', error);
+      alert('Could not access microphone');
     }
   };
-  
+
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -314,23 +313,26 @@ export default function Home() {
     }
   };
   
+
+
+
   const handleAudioData = async (blob: Blob) => {
     try {
       const formData = new FormData();
       formData.append('audio', blob);
-  
+
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData
       });
-  
+
       if (!response.ok) {
         throw new Error('Transcription failed');
       }
-  
+
       const { text } = await response.json();
       setTranscript(text);
-
+      
       setData(prev => ({
         ...prev,
         emotional: {
@@ -340,12 +342,9 @@ export default function Home() {
       }));
     } catch (error) {
       console.error('Audio processing error:', error);
-      alert('Failed to process audio recording. Please try again.');
+      alert('Failed to process audio recording');
     }
   };
-
-  // Voice recording functions
-  
 
   // Render functions
   const renderInitialForm = () => (

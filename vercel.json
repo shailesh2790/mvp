@@ -1,0 +1,7 @@
+{
+    "env": {
+      "NEXT_PUBLIC_SUPABASE_URL": "https://bzvtodzebhqatckjulgh.supabase.co",
+      "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6dnRvZHplYmhxYXRja2p1bGdoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzgwNDk0NCwiZXhwIjoyMDUzMzgwOTQ0fQ.oWxM1mxIGH5QXrYwpOlgidswT9pnsdvpoz_uC8QobBQ",
+      "ASSEMBLY_AI_KEY": "779535daaee3432dbfda7aef6775ae05"
+    }
+  }
