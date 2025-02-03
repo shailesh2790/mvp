@@ -1,49 +1,63 @@
-'use client';
-
-import { Brain, Activity, AlertTriangle, Heart, ListChecks, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui/card';
+import { Brain, Activity, AlertTriangle, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useState } from 'react';
 
-interface ResultsSectionProps {
-  assessment: {
-    patterns: string[];
-    progress: {
-      improvements: string[];
-      concerns: string[];
-    };
-    personalizedRecommendations: string[];
-    earlyWarningSignals: string[];
-    eqDevelopment: {
-      strengths: string[];
-      areasForImprovement: string[];
-      exercises: string[];
-    };
-  };
-  history?: any[];
-}
-
-export default function ResultsSection({ assessment }: ResultsSectionProps) {
+const ResultsSection = () => {
   const [currentSection, setCurrentSection] = useState(0);
 
-  // If assessment is null or undefined, show loading state
-  if (!assessment) {
-    return (
-      <div className="p-6 text-gray-500 text-center text-xl">
-        Loading assessment results...
-      </div>
-    );
-  }
+  // Sample assessment data
+  const assessment = {
+    timestamp: new Date().toISOString(),
+    scores: {
+      emotional: 7.5,
+      cognitive: 6.8,
+      behavioral: 8.2,
+      overall: 7.5,
+      anxiety: 4.2,
+      depression: 3.8,
+      stress: 5.1,
+      eq: 7.8
+    },
+    summary: "Your assessment indicates overall good mental well-being with particularly strong behavioral health scores.",
+    detailedAnalysis: {
+      emotional: {
+        summary: "Your emotional health shows good resilience and stability.",
+        details: ["Strong emotional awareness", "Effective stress management"],
+        recommendations: ["Practice daily mindfulness", "Continue journaling"]
+      },
+      cognitive: {
+        summary: "Your cognitive function demonstrates above-average performance.",
+        details: ["Good problem-solving skills", "Strong memory retention"],
+        recommendations: ["Try new learning challenges", "Engage in brain training"]
+      },
+      behavioral: {
+        summary: "Your behavioral patterns show healthy adaptability.",
+        details: ["Consistent sleep schedule", "Regular exercise routine"],
+        recommendations: ["Maintain current routines", "Add variety to activities"]
+      },
+      conditionSpecific: {
+        summary: "Some areas may benefit from targeted attention.",
+        details: ["Moderate stress levels noted", "Sleep quality could improve"],
+        recommendations: ["Consider stress reduction techniques", "Optimize sleep environment"]
+      }
+    },
+    historicalTrends: {
+      trend: "Showing consistent improvement over the past 3 months",
+      changes: ["15% reduction in stress levels", "20% improvement in sleep quality"],
+      recommendations: ["Continue current practices", "Focus on maintaining gains"]
+    }
+  };
 
-  // Create safe data with distinct variable names to avoid overwriting
-  const safeData = {
-    patterns: assessment.patterns || [],
-    progressImprovements: assessment.progress?.improvements || [],
-    progressConcerns: assessment.progress?.concerns || [],
-    recommendations: assessment.personalizedRecommendations || [],
-    warnings: assessment.earlyWarningSignals || [],
-    strengths: assessment.eqDevelopment?.strengths || [],
-    eqImprovements: assessment.eqDevelopment?.areasForImprovement || [],
-    exercises: assessment.eqDevelopment?.exercises || []
+  const getSeverityColor = (score) => {
+    if (score >= 7) return 'text-green-600';
+    if (score >= 5) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getProgressColor = (score) => {
+    if (score >= 7) return 'bg-green-500';
+    if (score >= 5) return 'bg-yellow-500';
+    return 'bg-red-500';
   };
 
   const handlePrevious = () => {
@@ -56,208 +70,160 @@ export default function ResultsSection({ assessment }: ResultsSectionProps) {
 
   const handleRetakeAssessment = () => {
     // Reset assessment state and redirect to the first question
+    console.log("Retake assessment clicked");
   };
 
   return (
     <div className="space-y-8 p-6 max-w-5xl mx-auto">
       {currentSection === 0 && (
-        <div>
-          {/* Behavioral Patterns Card */}
-          {safeData.patterns.length > 0 && (
-            <Card className="border-2 border-blue-300 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-blue-100 to-white">
-                <CardTitle className="flex items-center gap-3">
-                  <Brain className="h-6 w-6 text-blue-600" />
-                  Behavioral Patterns
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <ul className="space-y-3">
-                  {safeData.patterns.map((pattern, i) => (
-                    <li key={i} className="flex items-start gap-2 text-gray-700">
-                      <ListChecks className="h-5 w-5 text-blue-500 mt-1" />
-                      {pattern}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <Card className="border-2 border-blue-200 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-white">
+            <CardTitle className="flex items-center gap-3 text-2xl text-blue-800">
+              <Activity className="h-8 w-8 text-blue-600" />
+              Assessment Results
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              <p className="text-xl font-semibold text-gray-800">{assessment.summary}</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {/* Score cards */}
+                {Object.entries({
+                  'Emotional Health': assessment.scores.emotional,
+                  'Cognitive Function': assessment.scores.cognitive,
+                  'Behavioral Health': assessment.scores.behavioral,
+                  'Emotional Intelligence': assessment.scores.eq
+                }).map(([label, score]) => (
+                  <div key={label} className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="font-semibold text-gray-700">{label}</p>
+                      <span className={`text-lg font-bold ${getSeverityColor(score)}`}>
+                        {score.toFixed(1)}/10
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-200 rounded-full">
+                      <div 
+                        className={`h-2.5 rounded-full ${getProgressColor(score)}`}
+                        style={{ width: `${score * 10}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {currentSection === 1 && (
         <div>
-          {/* Progress Tracking Card */}
-          {(safeData.progressImprovements.length > 0 || safeData.progressConcerns.length > 0) && (
-            <Card className="border-2 border-green-300 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-green-100 to-white">
-                <CardTitle className="flex items-center gap-3">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
-                  Progress Tracking
+          {Object.entries(assessment.detailedAnalysis).map(([category, analysis]) => (
+            <Card key={category} className="border-2 border-gray-200 shadow-lg mb-6">
+              <CardHeader className="bg-gradient-to-r from-gray-50 to-white">
+                <CardTitle className="flex items-center gap-3 text-xl text-gray-800">
+                  {category === 'emotional' && <Heart className="h-6 w-6 text-red-500" />}
+                  {category === 'cognitive' && <Brain className="h-6 w-6 text-purple-500" />}
+                  {category === 'behavioral' && <Activity className="h-6 w-6 text-blue-500" />}
+                  {category === 'conditionSpecific' && <AlertTriangle className="h-6 w-6 text-yellow-500" />}
+                  {category.charAt(0).toUpperCase() + category.slice(1).replace(/([A-Z])/g, ' $1')} Analysis
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                {safeData.progressImprovements.length > 0 && (
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h4 className="font-bold text-green-900 mb-3">Improvements</h4>
-                    <ul className="space-y-2">
-                      {safeData.progressImprovements.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2 text-green-800">
-                          <Activity className="h-5 w-5 text-green-500 mt-0.5" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {safeData.progressConcerns.length > 0 && (
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <h4 className="font-bold text-yellow-900 mb-3">Areas of Concern</h4>
-                    <ul className="space-y-2">
-                      {safeData.progressConcerns.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2 text-yellow-800">
-                          <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              <CardContent className="pt-6">
+                <div className="space-y-6">
+                  <p className="text-gray-800 text-lg">{analysis.summary}</p>
+                  
+                  {analysis.details.length > 0 && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-gray-800 mb-3">Key Observations</h4>
+                      <ul className="space-y-2">
+                        {analysis.details.map((detail, index) => (
+                          <li key={index} className="flex items-start gap-2 text-gray-700">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>{detail}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {analysis.recommendations.length > 0 && (
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-gray-800 mb-3">Recommendations</h4>
+                      <ul className="space-y-2">
+                        {analysis.recommendations.map((rec, index) => (
+                          <li key={index} className="flex items-start gap-2 text-gray-700">
+                            <span className="text-green-500 mt-1">•</span>
+                            <span>{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          )}
+          ))}
         </div>
       )}
 
-      {currentSection === 2 && (
-        <div>
-          {/* Personalized Recommendations Card */}
-          {safeData.recommendations.length > 0 && (
-            <Card className="border-2 border-purple-300 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-purple-100 to-white">
-                <CardTitle className="flex items-center gap-3">
-                  <Heart className="h-6 w-6 text-purple-600" />
-                  Personalized Recommendations
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <ul className="space-y-3">
-                  {safeData.recommendations.map((rec, i) => (
-                    <li key={i} className="flex items-start gap-2 text-gray-700">
-                      <ListChecks className="h-5 w-5 text-purple-500 mt-1" />
-                      {rec}
+      {currentSection === 2 && assessment.historicalTrends && (
+        <Card className="border-2 border-gray-200 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-white">
+            <CardTitle className="flex items-center gap-3 text-xl text-gray-800">
+              <Activity className="h-6 w-6 text-indigo-500" />
+              Progress & Trends
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-gray-800 text-lg mb-6">{assessment.historicalTrends.trend}</p>
+            {assessment.historicalTrends.changes.length > 0 && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-800 mb-3">Notable Changes</h4>
+                <ul className="space-y-2">
+                  {assessment.historicalTrends.changes.map((change, index) => (
+                    <li key={index} className="flex items-start gap-2 text-gray-700">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>{change}</span>
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {currentSection === 3 && (
-        <div>
-          {/* Early Warning Signs Card */}
-          {safeData.warnings.length > 0 && (
-            <Card className="border-2 border-red-300 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-red-100 to-white">
-                <CardTitle className="flex items-center gap-3">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
-                  Early Warning Signs
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <ul className="space-y-3">
-                  {safeData.warnings.map((warning, i) => (
-                    <li key={i} className="flex items-start gap-2 text-gray-700">
-                      <AlertTriangle className="h-5 w-5 text-red-500 mt-1" />
-                      {warning}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {currentSection === 4 && (
-        <div>
-          {/* Emotional Intelligence Development Card */}
-          {(safeData.strengths.length > 0 || safeData.eqImprovements.length > 0 || safeData.exercises.length > 0) && (
-            <Card className="border-2 border-blue-300 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-blue-100 to-white">
-                <CardTitle className="flex items-center gap-3">
-                  <Brain className="h-6 w-6 text-blue-600" />
-                  Emotional Intelligence Development
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                {safeData.strengths.length > 0 && (
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h4 className="font-bold text-green-900 mb-3">Strengths</h4>
-                    <ul className="space-y-2">
-                      {safeData.strengths.map((strength, i) => (
-                        <li key={i} className="flex items-start gap-2 text-green-800">
-                          <Activity className="h-5 w-5 text-green-500 mt-0.5" />
-                          {strength}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {safeData.eqImprovements.length > 0 && (
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <h4 className="font-bold text-yellow-900 mb-3">Areas for Improvement</h4>
-                    <ul className="space-y-2">
-                      {safeData.eqImprovements.map((area, i) => (
-                        <li key={i} className="flex items-start gap-2 text-yellow-800">
-                          <Brain className="h-5 w-5 text-yellow-500 mt-0.5" />
-                          {area}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {safeData.exercises.length > 0 && (
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-bold text-blue-900 mb-3">Recommended Exercises</h4>
-                    <ul className="space-y-2">
-                      {safeData.exercises.map((exercise, i) => (
-                        <li key={i} className="flex items-start gap-2 text-blue-800">
-                          <ListChecks className="h-5 w-5 text-blue-500 mt-0.5" />
-                          {exercise}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       <div className="flex justify-between mt-6">
         {currentSection > 0 && (
-          <Button onClick={handlePrevious} className="flex items-center gap-2">
+          <button 
+            onClick={handlePrevious}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg flex items-center gap-2 hover:bg-blue-600"
+          >
             <ChevronLeft className="h-5 w-5" />
             Previous
-          </Button>
+          </button>
         )}
-        {currentSection < 4 && (
-          <Button onClick={handleNext} className="flex items-center gap-2">
+        {currentSection < 2 && (
+          <button
+            onClick={handleNext}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg flex items-center gap-2 hover:bg-blue-600"
+          >
             Next
             <ChevronRight className="h-5 w-5" />
-          </Button>
+          </button>
         )}
-        {currentSection === 4 && (
-          <Button onClick={handleRetakeAssessment} className="flex items-center gap-2">
+        {currentSection === 2 && (
+          <button
+            onClick={handleRetakeAssessment}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg flex items-center gap-2 hover:bg-blue-600"
+          >
             Retake Assessment
-          </Button>
+          </button>
         )}
       </div>
     </div>
   );
-}
+};
+
+export default ResultsSection;
